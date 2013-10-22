@@ -1,0 +1,44 @@
+{
+  "name": "manger",
+  "version": "0.0.1",
+  "description": "cache RSS and Atom feeds",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib",
+    "example": "example",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "tap test/*.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/michaelnisi/manger.git"
+  },
+  "keywords": [
+    "rss",
+    "atom",
+    "xml",
+    "cache",
+    "json",
+    "feed",
+    "normalize"
+  ],
+  "dependencies": {
+    "pickup": "0.1.x",
+    "levelup": "0.9.x",
+    "leveldown": "0.5.x"
+  },
+  "devDependencies": {
+    "tap": "0.4.x"
+  },
+  "engines": {
+    "node": "0.10.x"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Michael Nisi",
+    "email": "michael.nisi@gmail.com",
+    "url": "http://michaelnisi.com"
+  }
+}
