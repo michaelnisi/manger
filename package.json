@@ -30,6 +30,7 @@
     "leveldown": "0.5.x"
   },
   "devDependencies": {
+    "rimraf": "2.2.x",
     "tap": "0.4.x"
   },
   "engines": {

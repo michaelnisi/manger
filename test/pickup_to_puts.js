@@ -31,8 +31,10 @@ test('put from entry', function (t) {
 
   var entry = '{"id":"http://troubled.pro/2013/03/learning-from-erlang.html","link":"http://troubled.pro/2013/03/learning-from-erlang.html","title":"Learning from Erlang","updated":"Wed, 06 Mar 2013 01:00:00 +0100"}'
 
+  var key = 'BL7gkqIZT0wnOFHwUjCHAQ==\\x001362528000000\\x00BL7gkqIZT0wnOFHwUjCHAQ=='
+
   var expected = {
-    type:'put', key:'Wed, 06 Mar 2013 01:00:00 +0100', value:entry
+    type:'put', key:key, value:entry
   }
 
   var actual = put_from_entry(entry)
