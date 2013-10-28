@@ -14,14 +14,21 @@ test('setup', function (t) {
   t.end()
 })
 
-test('explore', function (t) {
+test('populate', function (t) {
   var opts = {}
   levelup(loc, opts, function (er, db) {
     t.notok(er, 'should not error')
     t.ok(db, 'should have db')
-    db.close(function (er) {
+    db.batch([
+      { type: 'put', key: 'foo', value: 'afoovalue' }
+    , { type: 'put', key: 'bar', value: 'abarvalue' }
+    , { type: 'put', key: 'baz', value: 'abazvalue' }
+    ], function (er) {
       t.notok(er, 'should not error')
-      t.end()
+      db.close(function (er) {
+        t.notok(er, 'should not error')
+        t.end()
+      })
     })
   })
 })
