@@ -6,7 +6,9 @@ var test = require('tap').test
   , fs = require('fs')
   , levelup = require('levelup')
   , path  = require('path')
-  , dir = '/tmp/manger-' + Math.floor(Math.random() * (1<<24))
+  , createEntryPut = require('../lib/db').createEntryPut
+
+var dir = '/tmp/manger-' + Math.floor(Math.random() * (1<<24))
   , loc = path.join(dir, 'test.db')
 
 test('setup', function (t) {
@@ -31,6 +33,22 @@ test('populate', function (t) {
       })
     })
   })
+})
+
+test('create entry put', function (t) {
+  t.equal(createEntryPut(null), null, 'should be null')
+  t.equal(createEntryPut(undefined), null, 'should be null')
+
+  var entry = '{"id":"http://troubled.pro/2013/03/learning-from-erlang.html","link":"http://troubled.pro/2013/03/learning-from-erlang.html","title":"Learning from Erlang","updated":"Wed, 06 Mar 2013 01:00:00 +0100"}'
+  var key = 'BL7gkqIZT0wnOFHwUjCHAQ==\\x001362528000000'
+  var expected = {
+    type:'put', key:key, value:entry
+  }
+
+  var actual = createEntryPut(entry)
+  t.ok(actual, 'should not be null')
+  t.deepEquals(actual, expected, 'should be equal')
+  t.end()
 })
 
 test('teardown', function (t) {
