@@ -2,9 +2,21 @@
 // db - db stuff
 
 var createHash = require('crypto').createHash
+  , stream = require('stream')
+  , Writable = require('stream').Writable
 
 module.exports.createEntryPut = createEntryPut
 module.exports.createEntryGet = createEntryGet
+module.exports.createWriteStream = createWriteStream
+
+function createWriteStream (db) {
+  var stream = new Writable({ objectMode:true })
+  stream._write = function (chunk, enc, cb) {
+    var op = chunk
+    db.put(op.key, op.value, null, cb)
+  }
+  return stream
+}
 
 function createEntryGet () {
   // TODO: write

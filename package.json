@@ -9,6 +9,9 @@
     "test": "test"
   },
   "scripts": {
+    "start": "node server.js",
+    "show-conf": "node config.js",
+    "repl": "node repl.js",
     "test": "tap test/*.js"
   },
   "repository": {
