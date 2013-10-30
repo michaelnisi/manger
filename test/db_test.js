@@ -5,14 +5,15 @@ var test = require('tap').test
   , assert = require('assert')
   , http = require('http')
   , pickup = require('pickup')
-  , pickupTransform = require('../pickup_to_puts')
   , rimraf = require('rimraf')
   , fs = require('fs')
   , levelup = require('levelup')
   , path  = require('path')
-  , createEntryPut = require('../db').createEntryPut
-  , createWriteStream = require('../db').createWriteStream
   , Writable = require('stream').Writable
+
+var createEntryPut = require('../lib/db').createEntryPut
+  , pickupTransform = require('../lib/pickup_to_puts')
+  , createWriteStream = require('../lib/db').createWriteStream
 
 var dir = '/tmp/manger-' + Math.floor(Math.random() * (1<<24))
   , loc = path.join(dir, 'test.db')

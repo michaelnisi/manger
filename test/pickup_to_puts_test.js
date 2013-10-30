@@ -2,10 +2,11 @@
 // pickup_to_ops - test pickup() to put operation
 
 var test = require('tap').test
-  , stream = require('../pickup_to_puts')
   , http = require('http')
   , pickup = require('pickup')
   , Writable = require('stream').Writable
+
+var stream = require('../lib/pickup_to_puts')
 
 test('stream', function (t) {
   var s = stream()
