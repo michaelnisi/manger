@@ -13,8 +13,8 @@ var test = require('tap').test
   , db = require('../lib/db')
 
 var createEntryPut = require('../lib/db').createEntryPut
-  , pickupTransform = require('../lib/pickup_to_puts')
   , createWriteStream = require('../lib/db').createWriteStream
+  , pickupTransform = require('../lib/pickup_to_puts')
   , Unstored = require('../lib/db').Unstored
   , FeedRequest = require('../lib/db').FeedRequest
 
@@ -69,7 +69,12 @@ test('unstored', function (t) {
       , new FeedRequest('xx', null, null, false)
       , new FeedRequest('yy', null, null, true)
       ]
-      t.deepEqual(actual, expected)
+      actual.forEach(function (req, i, arr) {
+        t.equal(req.url, expected[i].url)
+        t.equal(req.stored, expected[i].stored)
+        t.ok(req.from)
+        t.ok(req.to)
+      })
       t.end()
     })
   })

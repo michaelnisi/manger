@@ -7,11 +7,13 @@ var assert = require('assert')
   , util = require('util')
   , es = require('event-stream')
   , joke = require('joke')()
+  , Queue = require('./lib/queue').Queue
   , Unstored = require('./lib/db').Unstored
 
-util.inherits(Manger, stream.Transform)
 logstdout()
+var queue = new Queue()
 
+util.inherits(Manger, stream.Transform)
 function Manger (opts) {
   if (!(this instanceof Manger)) return new Manger(opts)
   stream.Transform.call(this)
@@ -33,6 +35,13 @@ Manger.prototype._transform = function (chunk, enc, cb) {
   es.readArray(urls)
     .pipe(unstored)
     .on('data', function (data) {
+      var req = data
+      if (!req.stored) {
+        var queued = !queue.push(req)
+        if (!queued) {
+          // TODO: go ahead and do it
+        }
+      }
   }).on('end', function () {
     me.push('ok')
     cb()
