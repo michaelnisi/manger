@@ -7,20 +7,47 @@ var assert = require('assert')
   , util = require('util')
   , es = require('event-stream')
   , joke = require('joke')()
+  , Unstored = require('./lib/db').Unstored
 
 util.inherits(Manger, stream.Transform)
+logstdout()
 
 function Manger (opts) {
   if (!(this instanceof Manger)) return new Manger(opts)
   stream.Transform.call(this)
-  logstdout()
+  opts = opts || defaults()
+  this.db = opts.db
 }
 
 Manger.prototype._transform = function (chunk, enc, cb) {
   var data = json(chunk)
-  joke.info(data)
-  this.push('{ "message": "received" }')
-  cb()
+  var urls = data ? data.feeds : null
+  if (!urls || urls.count < 1) {
+    this.push(null)
+    cb()
+    return
+  }
+
+  var unstored = new Unstored(this.db)
+  var me = this
+  es.readArray(urls)
+    .pipe(unstored)
+    .on('data', function (data) {
+  }).on('end', function () {
+    me.push('ok')
+    cb()
+  })
+}
+
+function readStream (db, start, end) {
+  var opts = { start:start, end:end, keys:false, values:true }
+  return db.createReadStream(opts)
+}
+
+function defaults() {
+  var opts = Object.create(null)
+  assert(opts.db)
+  return opts
 }
 
 function json (buf) {

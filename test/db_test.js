@@ -10,13 +10,17 @@ var test = require('tap').test
   , levelup = require('levelup')
   , path  = require('path')
   , Writable = require('stream').Writable
+  , db = require('../lib/db')
 
 var createEntryPut = require('../lib/db').createEntryPut
   , pickupTransform = require('../lib/pickup_to_puts')
   , createWriteStream = require('../lib/db').createWriteStream
+  , Unstored = require('../lib/db').Unstored
+  , FeedRequest = require('../lib/db').FeedRequest
 
 var dir = '/tmp/manger-' + Math.floor(Math.random() * (1<<24))
   , loc = path.join(dir, 'test.db')
+  , opts = {}
 
 test('setup', function (t) {
   fs.mkdirSync(dir, 0700)
@@ -24,6 +28,51 @@ test('setup', function (t) {
   t.end()
 })
 
+test('FeedRequest', function (t) {
+  t.throws(function () {
+    new FeedRequest()
+  })
+  var r = new FeedRequest('http://troubled.pro/rss.xml')
+  t.same(r.from, new Date(0))
+  t.ok(!r.stored)
+  t.end()
+})
+
+test('unstored', function (t) {
+  levelup(loc, opts, function (er, db) {
+    t.notok(er, 'should not error')
+    t.ok(db, 'should have db')
+
+    var unstored = new Unstored(db)
+    t.ok(unstored.readable && unstored.writable, 'should be duplex')
+
+    var actual = []
+    unstored.on('readable', function () {
+      var chunk
+      while (null !== (chunk = unstored.read())) {
+        actual.push(chunk)
+      }
+    })
+    t.ok(unstored.write('xx'))
+    t.ok(unstored.write('xx'))
+    t.ok(unstored.write('xx'))
+
+    db.put('feed\\x00yy', 'yy', function (er) {
+      t.ok(!er)
+      t.ok(unstored.write('yy'))
+      unstored.end()
+    })
+    unstored.on('end', function () {
+      t.same(actual[0], new Buffer('xx'))
+      t.same(actual[1], new Buffer('xx'))
+      t.same(actual[2], new Buffer('xx'))
+      t.equal(actual.length, 3)
+      t.end()
+    })
+  })
+})
+
+/*
 test('populate', function (t) {
   var opts = {}
   levelup(loc, opts, function (er, db) {
@@ -58,7 +107,7 @@ test('create entry put', function (t) {
   t.deepEquals(actual, expected, 'should be equal')
   t.end()
 })
-
+*/
 test('teardown', function (t) {
   rimraf(dir, function (err) {
     fs.stat(dir, function (err) {
