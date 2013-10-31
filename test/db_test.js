@@ -63,10 +63,13 @@ test('unstored', function (t) {
       unstored.end()
     })
     unstored.on('end', function () {
-      t.same(actual[0], new Buffer('xx'))
-      t.same(actual[1], new Buffer('xx'))
-      t.same(actual[2], new Buffer('xx'))
-      t.equal(actual.length, 3)
+      var expected = [
+        new FeedRequest('xx', null, null, false)
+      , new FeedRequest('xx', null, null, false)
+      , new FeedRequest('xx', null, null, false)
+      , new FeedRequest('yy', null, null, true)
+      ]
+      t.deepEqual(actual, expected)
       t.end()
     })
   })
