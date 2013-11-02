@@ -16,11 +16,11 @@ fs.mkdirSync(dir, 0700)
 levelup(loc, opts, function (er, db) {
   assert(!er && db)
   http.createServer(function (req, res) {
-      var tuples = [
-        ['troubled.pro/rss.xml', 2013, 10]
-      , ['feeds.muleradio.net/allmodcons', 2013]
-      ]
-      es.readArray(tuples)
-        .pipe(new Store(db)).pipe(res)
+    var tuples = [
+      ['troubled.pro/rss.xml', 2013, 10]
+    , ['feeds.muleradio.net/allmodcons', 2013]
+    ]
+    es.readArray(tuples)
+      .pipe(new Store(db)).pipe(res)
   }).listen(8765)
 })
