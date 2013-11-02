@@ -42,9 +42,9 @@ test('put/get entry', function (t) {
   }
   var uri = 'feeds.feedburner.com/cre-podcast'
   store.putEntry(uri, entry, function (er, key) {
-    t.ok(!er)
+    t.ok(!er, 'should not error')
     store.getEntry([uri, 2013, 10, 1], function (er, val) {
-      t.ok(!er)
+      t.ok(!er, 'should not error')
       t.end()
       db.close()
     })
@@ -56,7 +56,7 @@ test('put feed', function (t) {
   var store = new Store(db)
   var feed = { author:'Mule Radio Syndicate' }
   store.putFeed('feeds.feedburner.com/cre-podcast', feed, function (er) {
-    t.ok(!er)
+    t.ok(!er, 'should not error')
     db.close()
     t.end()
   })
@@ -82,7 +82,7 @@ test('get feed', function (t) {
   })
 })
 
-test('Store', function (t) {
+test('write', function (t) {
   var db = levelup(loc)
   var store = new Store(db)
   var tuples = [
@@ -90,19 +90,30 @@ test('Store', function (t) {
   , ['feeds.muleradio.net/allmodcons', 2013]
   ]
   function write () {
-    var tuple, ok = true, i = 0, len = tuples.length
-    while (i < len && ok) {
+    var tuple
+      , ok = true
+      , i = 0
+    while (i < tuples.length && ok) {
       tuple = tuples[i++]
       ok = store.write(tuple)
     }
-    if (i === len) store.end()
+    if (i === tuples.length) store.end()
   }
   store.once('drain', write)
   store.on('data', function (data) {
   })
   store.on('finish', function () {
-    db.close()
-    t.end()
+    var uri = null
+    tuples.forEach(function (tuple, i) {
+      uri = tuple[0]
+      store.getFeed(uri, function (er, value) {
+        t.ok(!er, 'should not error')
+        if (i === tuples.length - 1) {
+          db.close()
+          t.end()
+        }
+      })
+    })
   })
   write()
 })
