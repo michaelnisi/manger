@@ -19,8 +19,40 @@ test('setup', function (t) {
   t.end()
 })
 
+test('put feed', function (t) {
+  var db = levelup(loc)
+  var store = new Store(db)
+  var feed = { author:'Mule Radio Syndicate' }
+  store.putFeed('feeds.feedburner.com/cre-podcast', feed, function (er) {
+    t.ok(!er)
+    db.close()
+    t.end()
+  })
+})
+
+test('get feed', function (t) {
+  var db = levelup(loc)
+  var store = new Store(db)
+  store.getFeed('some.url.somewhere', function (er, val) {
+    t.ok(er, 'should error')
+    t.ok(!val, 'should not have value')
+  })
+  var feed = { author:'Mule Radio Syndicate' }
+  store.putFeed('feeds.feedburner.com/cre-podcast', feed, function (er) {
+    t.ok(!er, 'should not error')
+    store.getFeed('feeds.feedburner.com/cre-podcast', function (er, val) {
+      t.ok(!er, 'should not error')
+      t.ok(val, 'should have value')
+      t.same(val, '{"author":"Mule Radio Syndicate"}')
+      db.close()
+      t.end()
+    })
+  })
+})
+
 test('Store', function (t) {
-  var store = new Store(levelup(loc))
+  var db = levelup(loc)
+  var store = new Store(db)
   var tuples = [
     ['troubled.pro/rss.xml', 2013, 10]
   , ['feeds.muleradio.net/allmodcons', 2013]
@@ -35,9 +67,9 @@ test('Store', function (t) {
   }
   store.once('drain', write)
   store.on('data', function (data) {
-    console.error(data)
   })
   store.on('finish', function () {
+    db.close()
     t.end()
   })
   write()
