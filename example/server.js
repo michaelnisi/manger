@@ -15,8 +15,13 @@ fs.mkdirSync(dir, 0700)
 levelup(loc, opts, function (er, db) {
   assert(!er && db)
   http.createServer(function (req, res) {
-    var opts = {}
-    opts.db = db
-    req.pipe(manger(opts)).pipe(res)
+    if (req.method === 'POST') {
+      var opts = {}
+      opts.db = db
+      req.pipe(manger(opts)).pipe(res)
+    } else {
+      res.writeHead(200)
+      res.end('not yet\n')
+    }
   }).listen(8765)
 })
