@@ -9,6 +9,7 @@ var test = require('tap').test
   , path  = require('path')
   , Writable = require('stream').Writable
   , Store = require('../lib/manger').Store
+  , keyFromDate = require('../lib/manger').keyFromDate
 
 var dir = '/tmp/manger-' + Math.floor(Math.random() * (1<<24))
   , loc = path.join(dir, 'test.db')
@@ -17,6 +18,37 @@ test('setup', function (t) {
   fs.mkdirSync(dir, 0700)
   t.ok(fs.statSync(dir).isDirectory(), 'should exist')
   t.end()
+})
+
+test('key from Date', function (t) {
+  var actual = [
+    keyFromDate(new Date('Dec 08, 2013'))
+  , keyFromDate(new Date('Jan 12, 2013'))
+  ]
+  var expected = [
+    '2013\\x0012\\x008'
+  , '2013\\x001\\x0012'
+  ]
+  t.deepEqual(actual, expected, 'should be expected')
+  t.end()
+})
+
+test('put/get entry', function (t) {
+  var db = levelup(loc)
+  var store = new Store(db)
+  var entry = {
+    title: 'Mavericks'
+  , updated: new Date(2013, 9, 1)
+  }
+  var uri = 'feeds.feedburner.com/cre-podcast'
+  store.putEntry(uri, entry, function (er, key) {
+    t.ok(!er)
+    store.getEntry([uri, 2013, 10, 1], function (er, val) {
+      t.ok(!er)
+      t.end()
+      db.close()
+    })
+  })
 })
 
 test('put feed', function (t) {
