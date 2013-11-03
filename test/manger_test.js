@@ -20,11 +20,12 @@ test('setup', function (t) {
 })
 
 test('is requested', function (t) {
-  t.ok(manger.isRequested(['url', 2011, 10, 10], new Date(2012, 8, 8)))
-  t.ok(!manger.isRequested(['url', 2013, 10, 10], new Date(2012, 8, 8)))
-  t.ok(manger.isRequested(['url', 2013, 10, 10], new Date(2013, 11, 11)))
-  t.ok(manger.isRequested(['url', 2013, 10, 10], new Date(2013, 10, 11)))
-  t.ok(!manger.isRequested(['url', 2013, 10, 10], new Date(2013, 9, 9)))
+  var fun = manger.newer
+  t.ok(fun(new Date(2012, 8, 8), ['url', 2011, 10, 10]), 'should be newer')
+  t.ok(!fun(new Date(2012, 8, 8), ['url', 2013, 10, 10], 'should be older'))
+  t.ok(fun(new Date(2013, 11, 11), ['url', 2013, 10, 10]), 'should be newer')
+  t.ok(fun(new Date(2013, 10, 11), ['url', 2013, 10, 10]), 'should be newer')
+  t.ok(!fun(new Date(2013, 9, 9), ['url', 2013, 10, 10]), 'should be older')
   t.end()
 })
 
