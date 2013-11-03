@@ -8,8 +8,7 @@ var test = require('tap').test
   , levelup = require('levelup')
   , path  = require('path')
   , Writable = require('stream').Writable
-  , Store = require('../lib/manger').Store
-  , keyFromDate = require('../lib/manger').keyFromDate
+  , manger = require('../lib/manger.js')
 
 var dir = '/tmp/manger-' + Math.floor(Math.random() * (1<<24))
   , loc = path.join(dir, 'test.db')
@@ -20,10 +19,34 @@ test('setup', function (t) {
   t.end()
 })
 
+test('is requested', function (t) {
+  t.ok(manger.isRequested(['url', 2011, 10, 10], new Date(2012, 8, 8)))
+  t.ok(!manger.isRequested(['url', 2013, 10, 10], new Date(2012, 8, 8)))
+  t.ok(manger.isRequested(['url', 2013, 10, 10], new Date(2013, 11, 11)))
+  t.ok(manger.isRequested(['url', 2013, 10, 10], new Date(2013, 10, 11)))
+  t.ok(!manger.isRequested(['url', 2013, 10, 10], new Date(2013, 9, 9)))
+  t.end()
+})
+
+test('tuple from URL', function (t) {
+  var urls = [
+    'troubled.pro/rss.xml/2012/12/7'
+  , 'troubled.pro/rss.xml/2012/12/07'
+  ]
+  var tuples = [
+    ['troubled.pro/rss.xml', 2012, 12, 7]
+  , ['troubled.pro/rss.xml', 2012, 12, 7]
+  ]
+  urls.forEach(function (uri, i) {
+    t.deepEqual(manger.tupleFromUrl(uri), tuples[i])
+  })
+  t.end()
+})
+
 test('key from Date', function (t) {
   var actual = [
-    keyFromDate(new Date('Dec 08, 2013'))
-  , keyFromDate(new Date('Jan 12, 2013'))
+    manger.keyFromDate(new Date('Dec 08, 2013'))
+  , manger.keyFromDate(new Date('Jan 12, 2013'))
   ]
   var expected = [
     '2013\\x0012\\x008'
@@ -35,7 +58,7 @@ test('key from Date', function (t) {
 
 test('put/get entry', function (t) {
   var db = levelup(loc)
-  var store = new Store(db)
+  var store = new manger.Store(db)
   var entry = {
     title: 'Mavericks'
   , updated: new Date(2013, 9, 1)
@@ -53,7 +76,7 @@ test('put/get entry', function (t) {
 
 test('put feed', function (t) {
   var db = levelup(loc)
-  var store = new Store(db)
+  var store = new manger.Store(db)
   var feed = { author:'Mule Radio Syndicate' }
   store.putFeed('feeds.feedburner.com/cre-podcast', feed, function (er) {
     t.ok(!er, 'should not error')
@@ -64,7 +87,7 @@ test('put feed', function (t) {
 
 test('get feed', function (t) {
   var db = levelup(loc)
-  var store = new Store(db)
+  var store = new manger.Store(db)
   store.getFeed('some.url.somewhere', function (er, val) {
     t.ok(er, 'should error')
     t.ok(!val, 'should not have value')
@@ -84,7 +107,7 @@ test('get feed', function (t) {
 
 test('write', function (t) {
   var db = levelup(loc)
-  var store = new Store(db)
+  var store = new manger.Store(db)
   var tuples = [
     ['troubled.pro/rss.xml', 2013, 10]
   , ['feeds.muleradio.net/allmodcons', 2013]

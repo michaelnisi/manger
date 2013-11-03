@@ -12,7 +12,7 @@
     "start": "node server.js",
     "show-conf": "node config.js",
     "repl": "node repl.js",
-    "test": "export TEST=1 ; tap test/*.js"
+    "test": "export NODE_TEST=1 ; tap test/*.js"
   },
   "repository": {
     "type": "git",
