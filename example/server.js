@@ -20,16 +20,16 @@ levelup(loc, opts, function (er, db) {
     var tokens = req.url.split('/')
     tokens.shift()
     var token = tokens.shift()
-    if (token != 'feeds') {
+    var uri = tokens.join('/')
+    var tuple = tupleFromUrl(uri)
+    if (token != 'feeds' || !tuple) {
       res.writeHead(200)
       res.end('not found\n')
       return
     }
-    var uri = tokens.join('/')
-    var tuples = [
-      tupleFromUrl(uri)
-    ]
-    es.readArray(tuples)
-      .pipe(new Store(db)).pipe(res)
+    var store = new Store(db)
+    store.pipe(res)
+    store.write(tuple)
+    store.end()
   }).listen(8765)
 })

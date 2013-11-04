@@ -19,6 +19,28 @@ test('setup', function (t) {
   t.end()
 })
 
+test('tuple from URL', function (t) {
+  var urls = [
+    ''
+  , '/'
+  , 'troubled.pro'
+  , 'troubled.pro/rss.xml/2012/12/7'
+  , 'troubled.pro/rss.xml/2012/12/07'
+  ]
+  var tuples = [
+    null
+  , null
+  , ['troubled.pro']
+  , ['troubled.pro/rss.xml', 2012, 12, 7]
+  , ['troubled.pro/rss.xml', 2012, 12, 7]
+  ]
+  urls.forEach(function (uri, i) {
+    t.deepEqual(manger.tupleFromUrl(uri), tuples[i])
+  })
+  t.end()
+})
+
+/*
 test('is requested', function (t) {
   var fun = manger.newer
   t.ok(fun(new Date(2012, 8, 8), ['url', 2011, 10, 10]), 'should be newer')
@@ -29,20 +51,6 @@ test('is requested', function (t) {
   t.end()
 })
 
-test('tuple from URL', function (t) {
-  var urls = [
-    'troubled.pro/rss.xml/2012/12/7'
-  , 'troubled.pro/rss.xml/2012/12/07'
-  ]
-  var tuples = [
-    ['troubled.pro/rss.xml', 2012, 12, 7]
-  , ['troubled.pro/rss.xml', 2012, 12, 7]
-  ]
-  urls.forEach(function (uri, i) {
-    t.deepEqual(manger.tupleFromUrl(uri), tuples[i])
-  })
-  t.end()
-})
 
 test('key from Date', function (t) {
   var actual = [
@@ -149,4 +157,4 @@ test('teardown', function (t) {
       t.end()
     })
   })
-})
+})*/
