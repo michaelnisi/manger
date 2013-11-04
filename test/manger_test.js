@@ -19,6 +19,49 @@ test('setup', function (t) {
   t.end()
 })
 
+test('put/get entry', function (t) {
+  var db = levelup(loc)
+  var store = new manger.Store(db)
+  var entry = {
+    title: 'Mavericks'
+  , updated: new Date(2013, 9, 1)
+  }
+  var uri = 'feeds.feedburner.com/cre-podcast'
+  store.putEntry(uri, entry, function (er, key) {
+    t.ok(!er, 'should not error')
+    store.getEntry([uri, 2013, 10, 1], function (er, val) {
+      t.ok(!er, 'should not error')
+      t.end()
+      db.close()
+    })
+  })
+})
+
+test('key from Date', function (t) {
+  var actual = [
+    manger.keyFromDate(new Date('Dec 08, 2013'))
+  , manger.keyFromDate(new Date('Jan 12, 2013'))
+  ]
+  var expected = [
+    '2013\\x0012\\x0008'
+  , '2013\\x0001\\x0012'
+  ]
+  t.deepEqual(actual, expected, 'should be expected')
+  t.end()
+})
+
+test('is requested', function (t) {
+  var fun = manger.newer
+  t.ok(fun(new Date(2012, 8, 8), ['url', 2011, 10, 10]), 'should be newer')
+  t.ok(!fun(new Date(2012, 8, 8), ['url', 2013, 10, 10], 'should be older'))
+  t.ok(fun(new Date(2013, 11, 11), ['url', 2013, 10, 10]), 'should be newer')
+  t.ok(fun(new Date(2013, 10, 11), ['url', 2013, 10, 10]), 'should be newer')
+  t.ok(!fun(new Date(2013, 9, 9), ['url', 2013, 10, 10]), 'should be older')
+  t.ok(fun(new Date('Wed, 06 Mar 2013 01:00:00 +0100'), ['url', 2013]), 'should be newer')
+  t.ok(fun(new Date(), ['url', 2013]), 'should be newer')
+  t.end()
+})
+
 test('tuple from URL', function (t) {
   var urls = [
     ''
@@ -38,49 +81,6 @@ test('tuple from URL', function (t) {
     t.deepEqual(manger.tupleFromUrl(uri), tuples[i])
   })
   t.end()
-})
-
-/*
-test('is requested', function (t) {
-  var fun = manger.newer
-  t.ok(fun(new Date(2012, 8, 8), ['url', 2011, 10, 10]), 'should be newer')
-  t.ok(!fun(new Date(2012, 8, 8), ['url', 2013, 10, 10], 'should be older'))
-  t.ok(fun(new Date(2013, 11, 11), ['url', 2013, 10, 10]), 'should be newer')
-  t.ok(fun(new Date(2013, 10, 11), ['url', 2013, 10, 10]), 'should be newer')
-  t.ok(!fun(new Date(2013, 9, 9), ['url', 2013, 10, 10]), 'should be older')
-  t.end()
-})
-
-
-test('key from Date', function (t) {
-  var actual = [
-    manger.keyFromDate(new Date('Dec 08, 2013'))
-  , manger.keyFromDate(new Date('Jan 12, 2013'))
-  ]
-  var expected = [
-    '2013\\x0012\\x008'
-  , '2013\\x001\\x0012'
-  ]
-  t.deepEqual(actual, expected, 'should be expected')
-  t.end()
-})
-
-test('put/get entry', function (t) {
-  var db = levelup(loc)
-  var store = new manger.Store(db)
-  var entry = {
-    title: 'Mavericks'
-  , updated: new Date(2013, 9, 1)
-  }
-  var uri = 'feeds.feedburner.com/cre-podcast'
-  store.putEntry(uri, entry, function (er, key) {
-    t.ok(!er, 'should not error')
-    store.getEntry([uri, 2013, 10, 1], function (er, val) {
-      t.ok(!er, 'should not error')
-      t.end()
-      db.close()
-    })
-  })
 })
 
 test('put feed', function (t) {
@@ -157,4 +157,4 @@ test('teardown', function (t) {
       t.end()
     })
   })
-})*/
+})
