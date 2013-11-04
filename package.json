@@ -1,7 +1,7 @@
 {
   "name": "manger",
   "version": "0.0.1",
-  "description": "cache RSS and Atom feeds",
+  "description": "proxy feeds",
   "main": "index.js",
   "directories": {
     "example": "example",
@@ -23,7 +23,8 @@
     "cache",
     "json",
     "feed",
-    "normalize"
+    "aggregate",
+    "proxy"
   ],
   "dependencies": {
     "pickup": "0.1.x",
