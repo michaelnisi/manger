@@ -9,9 +9,8 @@
     "test": "test"
   },
   "scripts": {
-    "start": "node server.js",
-    "show-conf": "node config.js",
-    "repl": "node repl.js",
+    "start": "node example/server > /dev/null & echo $! > .pid",
+    "stop": "kill `cat .pid`",
     "test": "export NODE_TEST=1 ; tap test/*.js"
   },
   "repository": {
