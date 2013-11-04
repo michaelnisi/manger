@@ -1,13 +1,13 @@
 # manger - proxy feeds 
 
-The manger [Node.js](http://nodejs.org/) module is a feed proxy.
+The manger [Node.js](http://nodejs.org/) module is a feed proxy. Please note that this is a mere PoC so far.
 
 ## Usage
     
     GET /feeds/url/year/month/day
     GET /feeds -d
 
-To run an example, in the manger directory, do:
+To run the example in the manger directory, do:
 
     npm start
 
@@ -20,12 +20,6 @@ To run an example, in the manger directory, do:
          ["feeds.muleradio.net/unprofessional", 2013, 10]]}' | json
     
     npm stop
-
-## Installation
-
-Install with [npm](https://npmjs.org):
-
-    npm install manger
 
 ## License
 
