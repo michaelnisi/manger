@@ -132,8 +132,6 @@ test('write', function (t) {
     if (i === tuples.length) store.end()
   }
   store.once('drain', write)
-  store.on('data', function (data) {
-  })
   store.on('finish', function () {
     var uri = null
     tuples.forEach(function (tuple, i) {

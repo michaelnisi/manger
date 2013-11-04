@@ -5,7 +5,6 @@ var http = require('http')
   , assert = require('assert')
   , fs = require('fs')
   , Store = require('../lib/manger').Store
-  , es = require('event-stream')
   , tupleFromUrl = require('../lib/manger').tupleFromUrl
 
 var dir = '/tmp/manger-' + Math.floor(Math.random() * (1<<24))
@@ -57,8 +56,19 @@ function respond (req, res, db, body) {
     end(res)
     return
   }
-  // TODO: combined feeds are not working yet
-  es.readArray(data.feeds)
-    .pipe(new Store(db))
-    .pipe(res)
+  var tuples = data.feeds
+  var store = new Store(db)
+  function write () {
+    var tuple
+      , ok = true
+      , i = 0
+    while (i < tuples.length && ok) {
+      tuple = tuples[i++]
+      ok = store.write(tuple)
+    }
+    if (i === tuples.length) store.end()
+  }
+  store.once('drain', write)
+  write()
+  store.pipe(res)
 }
