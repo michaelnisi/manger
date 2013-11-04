@@ -4,8 +4,8 @@ var http = require('http')
   , path  = require('path')
   , assert = require('assert')
   , fs = require('fs')
-  , Store = require('../lib/manger').Store
-  , tupleFromUrl = require('../lib/manger').tupleFromUrl
+  , Store = require('../').Store
+  , tupleFromUrl = require('../').tupleFromUrl
 
 var dir = '/tmp/manger-' + Math.floor(Math.random() * (1<<24))
   , loc = path.join(dir, 'test.db')

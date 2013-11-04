@@ -8,7 +8,7 @@ var test = require('tap').test
   , levelup = require('levelup')
   , path  = require('path')
   , Writable = require('stream').Writable
-  , manger = require('../lib/manger.js')
+  , manger = require('../')
 
 var dir = '/tmp/manger-' + Math.floor(Math.random() * (1<<24))
   , loc = path.join(dir, 'test.db')
