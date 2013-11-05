@@ -8,8 +8,8 @@ test('key from Date', function (t) {
   , manger.keyFromDate(new Date('Jan 12, 2013'))
   ]
   var expected = [
-    '2013\\x0012\\x0008'
-  , '2013\\x0001\\x0012'
+    '2013\x0012\x0008'
+  , '2013\x0001\x0012'
   ]
   t.deepEqual(actual, expected, 'should be expected')
   t.end()
