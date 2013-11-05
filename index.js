@@ -20,6 +20,14 @@ var createHash = require('crypto').createHash
   , assert = require('assert')
   , url = require('url')
 
+// entry\x00FEED_URL\x00YYYYMMDD
+// TODO: entry\x00FEED_URL\x00YYYYMMDDHHMM
+// feed\x00FEED_URL
+LEVEL_KEY_ENTRY = 'entry'
+LEVEL_KEY_FEED = 'feed'
+LEVEL_KEY_DIV = '\x00'
+LEVEL_KEY_END = '\xff'
+
 util.inherits(Store, Transform)
 function Store (db) {
   if (!(this instanceof Store)) return new Store(db)
@@ -51,11 +59,11 @@ Store.prototype._flush = function (cb) {
 }
 
 Store.prototype.retrieve = function (tuple, cb) {
-  var start = ['entry', keyFromTuple(tuple)].join('\\x00')
+  var start = [LEVEL_KEY_ENTRY, keyFromTuple(tuple)].join(LEVEL_KEY_DIV)
   var end = [
-      'entry', keyFromUri(tuple[0]),
+      LEVEL_KEY_ENTRY, keyFromUri(tuple[0]),
       keyFromDate(new Date())
-  ].join('\\x00')
+  ].join(LEVEL_KEY_DIV)
   var stream = this.db.createReadStream({start:start, end:end})
   var me = this
   stream.on('data', function (data) {
@@ -77,14 +85,14 @@ Store.prototype.request = function (tuple, cb) {
         console.error(er)
         cb()
       })
-      .on('feed', function (feed) {
+      .on(LEVEL_KEY_FEED, function (feed) {
         var str = JSON.stringify(feed)
         // TODO: push feed
         me.putFeed(uri, str, function (er) {
           if (er) console.error(er)
         })
       })
-      .on('entry', function (entry) {
+      .on(LEVEL_KEY_ENTRY, function (entry) {
         var str = me.prepend(JSON.stringify(entry))
         var date = entry.updated ? new Date(entry.updated) : new Date()
         if (newer(date, tuple)) me.push(str)
@@ -108,27 +116,27 @@ Store.prototype.prepend = function (str) {
 Store.prototype.putEntry = function (uri, entry, cb) {
   var date = new Date(entry.updated)
   var key = [
-    'entry'
+    LEVEL_KEY_ENTRY
   , keyFromUri(uri)
   , keyFromDate(date)
-  ].join('\\x00')
+  ].join(LEVEL_KEY_DIV)
   this.db.put(key, JSON.stringify(entry), function (er) {
     cb(er, key)
   })
 }
 
 Store.prototype.getEntry = function (tuple, cb) {
-  var key = ['entry', keyFromTuple(tuple)].join('\\x00')
+  var key = [LEVEL_KEY_ENTRY, keyFromTuple(tuple)].join(LEVEL_KEY_DIV)
   this.db.get(key, cb)
 }
 
 Store.prototype.putFeed = function (uri, feed, cb) {
-  var key = ['feed', keyFromUri(uri)].join('\\x00')
+  var key = [LEVEL_KEY_FEED, keyFromUri(uri)].join(LEVEL_KEY_DIV)
   this.db.put(key, JSON.stringify(feed), cb)
 }
 
 Store.prototype.getFeed = function (uri, cb) {
-  var key = ['feed', keyFromUri(uri)].join('\\x00')
+  var key = [LEVEL_KEY_FEED, keyFromUri(uri)].join(LEVEL_KEY_DIV)
   this.db.get(key, cb)
 }
 
@@ -194,13 +202,13 @@ function formatDateTuple (tuple) {
     if (str.length < 2) str = '0' + str
     strs.push(str)
   })
-  return strs.join('\\x00')
+  return strs.join(LEVEL_KEY_DIV)
 }
 
 function keyFromTuple (tuple) {
   var tokens = tuple.slice(0)
   var uri = keyFromUri(tokens.shift())
   var date = formatDateTuple(tokens)
-  var key = [uri, date].join('\\x00')
+  var key = [uri, date].join(LEVEL_KEY_DIV)
   return key
 }
