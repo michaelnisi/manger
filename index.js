@@ -1,8 +1,10 @@
 
 // manger - proxy feeds
 
-module.exports.Store = Store
+module.exports.FeedStream = FeedStream
+module.exports.Store = EntryStream // TODO: export EntryStream
 module.exports.tupleFromUrl = tupleFromUrl
+module.exports.getFeed = getFeed
 
 if (process.env.NODE_TEST) {
   module.exports.keyFromDate = keyFromDate
@@ -25,9 +27,28 @@ var ENT = 'ent' // ent\x00hash(feed_url)\x00YYYY\x00MM\x00DD
   , DIV = '\x00'
   , END = '\xff'
 
-util.inherits(Store, Transform)
-function Store (db) {
-  if (!(this instanceof Store)) return new Store(db)
+util.inherits(FeedStream, Transform)
+function FeedStream (db) {
+  if (!(this instanceof FeedStream)) return new FeedStream(db)
+  Transform.call(this, { objectMode:true })
+  this.db = db
+}
+
+FeedStream.prototype._transform = function (uri, enc, cb) {
+  var me = this
+  getFeed(this.db, uri, function (er, feed) {
+    if (feed) {
+      me.push(feed)
+    } else {
+      // TODO: retrieve
+    }
+    cb()
+  })
+}
+
+util.inherits(EntryStream, Transform)
+function EntryStream (db) {
+  if (!(this instanceof EntryStream)) return new EntryStream(db)
   Transform.call(this, { objectMode:true })
   this.db = db
   this.state = 0
@@ -35,7 +56,7 @@ function Store (db) {
 
 // expects tuples of the form ['url', 'year', 'month', 'day']
 // where all but url is optional
-Store.prototype._transform = function (tuple, enc, cb) {
+EntryStream.prototype._transform = function (tuple, enc, cb) {
   if (this.state === 0) {
     this.push('{"r":[')
     this.state = 1
@@ -50,12 +71,12 @@ Store.prototype._transform = function (tuple, enc, cb) {
   })
 }
 
-Store.prototype._flush = function (cb) {
+EntryStream.prototype._flush = function (cb) {
   this.push(']}')
   cb()
 }
 
-Store.prototype.retrieve = function (tuple, cb) {
+EntryStream.prototype.retrieve = function (tuple, cb) {
   var start = [ENT, keyFromTuple(tuple)].join(DIV)
   var end = [ENT, keyFromUri(tuple[0]),keyFromDate(new Date())].join(DIV)
   var stream = this.db.createReadStream({start:start, end:end})
@@ -69,7 +90,7 @@ Store.prototype.retrieve = function (tuple, cb) {
   })
 }
 
-Store.prototype.request = function (tuple, cb) {
+EntryStream.prototype.request = function (tuple, cb) {
   var uri = tuple[0]
     , me = this
   http.get(['http://', uri].join(''), function (res) {
@@ -79,14 +100,14 @@ Store.prototype.request = function (tuple, cb) {
         console.error(er)
         cb()
       })
-      .on(FED, function (feed) {
+      .on('feed', function (feed) {
         var str = JSON.stringify(feed)
         // TODO: push feed
         me.putFeed(uri, str, function (er) {
           if (er) console.error(er)
         })
       })
-      .on(ENT, function (entry) {
+      .on('entry', function (entry) {
         var str = me.prepend(JSON.stringify(entry))
         var date = entry.updated ? new Date(entry.updated) : new Date()
         if (newer(date, tuple)) me.push(str)
@@ -100,14 +121,14 @@ Store.prototype.request = function (tuple, cb) {
   })
 }
 
-Store.prototype.prepend = function (str) {
+EntryStream.prototype.prepend = function (str) {
   var s = (this.state === 2 ? ',' : '') + str
   this.state = 2
   return s
 }
 
 // where uri is the feed's url
-Store.prototype.putEntry = function (uri, entry, cb) {
+EntryStream.prototype.putEntry = function (uri, entry, cb) {
   var date = new Date(entry.updated)
   var key = [
     ENT
@@ -119,19 +140,19 @@ Store.prototype.putEntry = function (uri, entry, cb) {
   })
 }
 
-Store.prototype.getEntry = function (tuple, cb) {
+EntryStream.prototype.getEntry = function (tuple, cb) {
   var key = [ENT, keyFromTuple(tuple)].join(DIV)
   this.db.get(key, cb)
 }
 
-Store.prototype.putFeed = function (uri, feed, cb) {
+EntryStream.prototype.putFeed = function (uri, feed, cb) {
   var key = [FED, keyFromUri(uri)].join(DIV)
   this.db.put(key, JSON.stringify(feed), cb)
 }
 
-Store.prototype.getFeed = function (uri, cb) {
-  var key = [FED, keyFromUri(uri)].join(DIV)
-  this.db.get(key, cb)
+// TODO: remove this function
+EntryStream.prototype.getFeed = function (uri, cb) {
+  getFeed(this.db, uri, cb)
 }
 
 function tupleFromUrl (uri) {
@@ -205,4 +226,13 @@ function keyFromTuple (tuple) {
   var date = formatDateTuple(tokens)
   var key = [uri, date].join(DIV)
   return key
+}
+
+function getFeed (db, uri, cb) {
+  var key = [FED, keyFromUri(uri)].join(DIV)
+  db.get(key, cb)
+}
+
+function update (db) {
+
 }
