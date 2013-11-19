@@ -1,24 +1,35 @@
 
 var test = require('tap').test
   , assert = require('assert')
+  , st = require('st')
   , http = require('http')
   , pickup = require('pickup')
   , rimraf = require('rimraf')
   , fs = require('fs')
   , levelup = require('levelup')
+  , join = require('path').join
   , path  = require('path')
+  , child_process = require('child_process')
   , Writable = require('stream').Writable
   , manger = require('../')
 
 var dir = '/tmp/manger-' + Math.floor(Math.random() * (1<<24))
-  , loc = path.join(dir, 'test.db')
+  , loc = join(dir, 'test.db')
 
 test('setup', function (t) {
   fs.mkdirSync(dir, 0700)
   t.ok(fs.statSync(dir).isDirectory(), 'should exist')
-  t.end()
+
+  http.get(uri('nyt.xml'), function (res) {
+    t.ok(res)
+    t.end()
+  }).on('error', function (er) {
+    t.fail('server unavailable')
+    t.end()
+  })
 })
 
+/*
 test('put/get entry', function (t) {
   var db = levelup(loc)
   var store = new manger.Store(db)
@@ -102,7 +113,7 @@ test('write', function (t) {
   })
   write()
 })
-
+*/
 test('teardown', function (t) {
   rimraf(dir, function (err) {
     fs.stat(dir, function (err) {
@@ -111,3 +122,7 @@ test('teardown', function (t) {
     })
   })
 })
+
+function uri (f) {
+  return ['http://localhost:1337', f].join('/')
+}

@@ -8,9 +8,7 @@
     "test": "test"
   },
   "scripts": {
-    "start": "node example/server > /dev/null & echo $! > .pid",
-    "stop": "kill `cat .pid`",
-    "test": "export NODE_TEST=1 ; tap test/*.js"
+    "test": "test/test.sh"
   },
   "repository": {
     "type": "git",
@@ -33,6 +31,7 @@
   },
   "devDependencies": {
     "rimraf": "2.2.x",
+    "st": "0.2.x",
     "tap": "0.4.x"
   },
   "engines": {

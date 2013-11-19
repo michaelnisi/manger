@@ -3,8 +3,10 @@
 
 module.exports.FeedStream = FeedStream
 module.exports.Store = EntryStream // TODO: export EntryStream
-module.exports.tupleFromUrl = tupleFromUrl
-module.exports.getFeed = getFeed
+// module.exports.update = update
+
+module.exports.tupleFromUrl = tupleFromUrl // TODO: remove
+module.exports.getFeed = getFeed // TODO: remove
 
 if (process.env.NODE_TEST) {
   module.exports.keyFromDate = keyFromDate
@@ -102,12 +104,12 @@ EntryStream.prototype.request = function (tuple, cb) {
       })
       .on('feed', function (feed) {
         var str = JSON.stringify(feed)
-        // TODO: push feed
         me.putFeed(uri, str, function (er) {
           if (er) console.error(er)
         })
       })
       .on('entry', function (entry) {
+        entry.feed = uri // just so we know
         var str = me.prepend(JSON.stringify(entry))
         var date = entry.updated ? new Date(entry.updated) : new Date()
         if (newer(date, tuple)) me.push(str)
@@ -224,8 +226,7 @@ function keyFromTuple (tuple) {
   var tokens = tuple.slice(0)
   var uri = keyFromUri(tokens.shift())
   var date = formatDateTuple(tokens)
-  var key = [uri, date].join(DIV)
-  return key
+  return [uri, date].join(DIV)
 }
 
 function getFeed (db, uri, cb) {
