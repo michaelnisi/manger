@@ -12,6 +12,8 @@ var test = require('tap').test
   , child_process = require('child_process')
   , Writable = require('stream').Writable
   , manger = require('../')
+  , EntryStream = require('../').EntryStream
+  , FeedStream  = require('../').FeedStream
 
 var dir = '/tmp/manger-' + Math.floor(Math.random() * (1<<24))
   , loc = join(dir, 'test.db')
@@ -29,18 +31,16 @@ test('setup', function (t) {
   })
 })
 
-/*
 test('put/get entry', function (t) {
   var db = levelup(loc)
-  var store = new manger.Store(db)
   var entry = {
     title: 'Mavericks'
   , updated: new Date(2013, 9, 1)
   }
   var uri = 'feeds.feedburner.com/cre-podcast'
-  store.putEntry(uri, entry, function (er, key) {
+  manger.putEntry(db, uri, entry, function (er, key) {
     t.ok(!er, 'should not error')
-    store.getEntry([uri, 2013, 10, 1], function (er, val) {
+    manger.getEntry(db, [uri, 2013, 10, 1], function (er, val) {
       t.ok(!er, 'should not error')
       t.end()
       db.close()
@@ -48,12 +48,10 @@ test('put/get entry', function (t) {
   })
 })
 
-
 test('put feed', function (t) {
   var db = levelup(loc)
-  var store = new manger.Store(db)
-  var feed = { author:'Mule Radio Syndicate' }
-  store.putFeed('feeds.feedburner.com/cre-podcast', feed, function (er) {
+  var feed = { author:'NYT' }
+  manger.putFeed(db, 'localhost:1337/nyt.xml', feed, function (er) {
     t.ok(!er, 'should not error')
     db.close()
     t.end()
@@ -62,18 +60,17 @@ test('put feed', function (t) {
 
 test('get feed', function (t) {
   var db = levelup(loc)
-  var store = new manger.Store(db)
-  store.getFeed('some.url.somewhere', function (er, val) {
+  manger.getFeed(db, 'some.url.somewhere', function (er, val) {
     t.ok(er, 'should error')
     t.ok(!val, 'should not have value')
   })
-  var feed = { author:'Mule Radio Syndicate' }
-  store.putFeed('feeds.feedburner.com/cre-podcast', feed, function (er) {
+  var feed = { author:'NYT' }
+  manger.putFeed(db, 'localhost:1337/nyt.xml', feed, function (er) {
     t.ok(!er, 'should not error')
-    store.getFeed('feeds.feedburner.com/cre-podcast', function (er, val) {
+    manger.getFeed(db, 'localhost:1337/nyt.xml', function (er, val) {
       t.ok(!er, 'should not error')
       t.ok(val, 'should have value')
-      t.same(val, '{"author":"Mule Radio Syndicate"}')
+      t.same(val, '{"author":"NYT"}')
       db.close()
       t.end()
     })
@@ -82,10 +79,9 @@ test('get feed', function (t) {
 
 test('write', function (t) {
   var db = levelup(loc)
-  var store = new manger.Store(db)
+  var stream = new EntryStream(db)
   var tuples = [
-    ['troubled.pro/rss.xml', 2013, 10]
-  , ['feeds.muleradio.net/allmodcons', 2013]
+    ['localhost:1337/nyt.xml', 2013, 10]
   ]
   function write () {
     var tuple
@@ -93,16 +89,16 @@ test('write', function (t) {
       , i = 0
     while (i < tuples.length && ok) {
       tuple = tuples[i++]
-      ok = store.write(tuple)
+      ok = stream.write(tuple)
     }
-    if (i === tuples.length) store.end()
+    if (i === tuples.length) stream.end()
   }
-  store.once('drain', write)
-  store.on('finish', function () {
+  stream.once('drain', write)
+  stream.on('finish', function () {
     var uri = null
     tuples.forEach(function (tuple, i) {
       uri = tuple[0]
-      store.getFeed(uri, function (er, value) {
+      manger.getFeed(db, uri, function (er, value) {
         t.ok(!er, 'should not error')
         if (i === tuples.length - 1) {
           db.close()
@@ -113,7 +109,7 @@ test('write', function (t) {
   })
   write()
 })
-*/
+
 test('teardown', function (t) {
   rimraf(dir, function (err) {
     fs.stat(dir, function (err) {

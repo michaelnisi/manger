@@ -2,17 +2,20 @@
 // manger - proxy feeds
 
 module.exports.FeedStream = FeedStream
-module.exports.Store = EntryStream // TODO: export EntryStream
-// module.exports.update = update
+module.exports.EntryStream = EntryStream
+module.exports.update = update
 
 module.exports.tupleFromUrl = tupleFromUrl // TODO: remove
-module.exports.getFeed = getFeed // TODO: remove
 
 if (process.env.NODE_TEST) {
   module.exports.keyFromDate = keyFromDate
   module.exports.keyFromUri = keyFromUri
   module.exports.keyFromTuple = keyFromTuple
   module.exports.newer = newer
+  module.exports.putFeed = putFeed
+  module.exports.getFeed = getFeed
+  module.exports.putEntry = putEntry
+  module.exports.getEntry = getEntry
 }
 
 var createHash = require('crypto').createHash
@@ -66,7 +69,7 @@ EntryStream.prototype._transform = function (tuple, enc, cb) {
   var uri = tuple[0]
     , isCached = false
     , me = this
-  this.getFeed(uri, function (er, val) {
+  getFeed(this.db, uri, function (er, val) {
     if (val) assert(typeof val === 'string')
     isCached = !!val
     isCached ? me.retrieve(tuple, cb) : me.request(tuple, cb)
@@ -127,34 +130,6 @@ EntryStream.prototype.prepend = function (str) {
   var s = (this.state === 2 ? ',' : '') + str
   this.state = 2
   return s
-}
-
-// where uri is the feed's url
-EntryStream.prototype.putEntry = function (uri, entry, cb) {
-  var date = new Date(entry.updated)
-  var key = [
-    ENT
-  , keyFromUri(uri)
-  , keyFromDate(date)
-  ].join(DIV)
-  this.db.put(key, JSON.stringify(entry), function (er) {
-    cb(er, key)
-  })
-}
-
-EntryStream.prototype.getEntry = function (tuple, cb) {
-  var key = [ENT, keyFromTuple(tuple)].join(DIV)
-  this.db.get(key, cb)
-}
-
-EntryStream.prototype.putFeed = function (uri, feed, cb) {
-  var key = [FED, keyFromUri(uri)].join(DIV)
-  this.db.put(key, JSON.stringify(feed), cb)
-}
-
-// TODO: remove this function
-EntryStream.prototype.getFeed = function (uri, cb) {
-  getFeed(this.db, uri, cb)
 }
 
 function tupleFromUrl (uri) {
@@ -229,11 +204,33 @@ function keyFromTuple (tuple) {
   return [uri, date].join(DIV)
 }
 
+function putEntry (db, uri, entry, cb) {
+  var date = new Date(entry.updated)
+  var key = [
+    ENT
+  , keyFromUri(uri)
+  , keyFromDate(date)
+  ].join(DIV)
+  db.put(key, JSON.stringify(entry), function (er) {
+    cb(er, key)
+  })
+}
+
+function getEntry(db, tuple, cb) {
+  var key = [ENT, keyFromTuple(tuple)].join(DIV)
+  db.get(key, cb)
+}
+
+function putFeed(db, uri, feed, cb) {
+  var key = [FED, keyFromUri(uri)].join(DIV)
+  db.put(key, JSON.stringify(feed), cb)
+}
+
 function getFeed (db, uri, cb) {
   var key = [FED, keyFromUri(uri)].join(DIV)
   db.get(key, cb)
 }
 
 function update (db) {
-
+  console.error('not implemented')
 }
