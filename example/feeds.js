@@ -1,17 +1,34 @@
 
-//
+// feeds - query cache for feeds
 
 var resumer = require('resumer')
-  , manger = require('../')
-  , FeedStream = manger.FeedStream
-  , time = manger.time
+  , feeds = require('../').feeds
+  , time = require('../').time
+  , path = require('path')
+  , fs = require('fs')
+  , levelup = require('levelup')
 
-var payload = [
-  { url:'http://5by5.tv/rss', time:time(2013, 11, 11) }
-]
+var dir = '/tmp/manger-' + Math.floor(Math.random() * (1<<24))
+  , loc = path.join(dir, 'test.db')
+  , opts = {}
 
-var json = JSON.stringify(payload)
+fs.mkdirSync(dir, 0700)
+levelup(loc, opts, function (er, db) {
+  query(json(queries()), db)
+})
 
-var stream = resumer()
-stream.queue(json)
-stream.pipe(process.stdout)
+function query (json, db) {
+  resumer().queue(json)
+    .pipe(feeds(db))
+    .pipe(process.stdout)
+}
+
+function json (data) {
+  return JSON.stringify(data)
+}
+
+function queries () {
+  return [
+    { url:'http://5by5.tv/rss', time:time(2013, 11, 11) }
+  ]
+}

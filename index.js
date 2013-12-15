@@ -1,8 +1,8 @@
 
 // manger - proxy feeds
 
-module.exports.FeedStream = FeedStream
-module.exports.EntryStream = EntryStream
+module.exports.feeds = FeedStream
+module.exports.entries = EntryStream
 module.exports.update = update
 module.exports.time = time
 
