@@ -4,6 +4,7 @@
 module.exports.FeedStream = FeedStream
 module.exports.EntryStream = EntryStream
 module.exports.update = update
+module.exports.time = time
 
 module.exports.tupleFromUrl = tupleFromUrl // TODO: remove
 
@@ -22,6 +23,7 @@ var createHash = require('crypto').createHash
   , pickup = require('pickup')
   , http = require('http')
   , Writable = require('stream').Writable
+  , Readable = require('stream').Readable
   , Transform = require('stream').Transform
   , util = require('util')
   , assert = require('assert')
@@ -233,4 +235,15 @@ function getFeed (db, uri, cb) {
 
 function update (db) {
   console.error('not implemented')
+}
+
+function time (year, month, day, h, m, s, ms) {
+  year = year || 0
+  month = month || 0
+  day = day || 0
+  h = h || 0
+  m = m || 0
+  s = s || 0
+  ms = ms || 0
+  return new Date(year, month, day, h, m, s, ms).getTime()
 }
