@@ -33,7 +33,7 @@ JSON.stringify(queries())
 queries()
 ```js
 [
-  { url:'http://5by5.tv/rss', time:time(2013, 11, 11) }
+  { url:'http://5by5.tv/rss', time:new Date(2013, 12, 11).getTime() }
 ]
 ```
 db()
