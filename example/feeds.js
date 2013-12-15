@@ -8,27 +8,34 @@ var resumer = require('resumer')
   , fs = require('fs')
   , levelup = require('levelup')
 
-var dir = '/tmp/manger-' + Math.floor(Math.random() * (1<<24))
-  , loc = path.join(dir, 'test.db')
-  , opts = {}
+;(setup(function (er, db) {
+  print(json(queries()), db)
+}))()
 
-fs.mkdirSync(dir, 0700)
-levelup(loc, opts, function (er, db) {
-  query(json(queries()), db)
-})
-
-function query (json, db) {
+function print (json, db) {
   resumer().queue(json)
     .pipe(feeds(db))
     .pipe(process.stdout)
-}
-
-function json (data) {
-  return JSON.stringify(data)
 }
 
 function queries () {
   return [
     { url:'http://5by5.tv/rss', time:time(2013, 11, 11) }
   ]
+}
+
+// Details
+
+function setup (cb) {
+  var dir = '/tmp/manger-' + Math.floor(Math.random() * (1<<24))
+    , loc = path.join(dir, 'test.db')
+    , opts = {}
+  fs.mkdirSync(dir, 0700)
+  levelup(loc, opts, function (er, db) {
+    cb(er, db)
+  })
+}
+
+function json (data) {
+  return JSON.stringify(data)
 }

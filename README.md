@@ -1,4 +1,4 @@
-# manger - cache feeds 
+# manger - cache feeds (WIP) 
 
 The manger [Node.js](http://nodejs.org/) module caches RSS and Atom formatted XML feeds using [LevelDB](https://github.com/rvagg/node-levelup).
 
@@ -9,39 +9,37 @@ The manger [Node.js](http://nodejs.org/) module caches RSS and Atom formatted XM
 Stream [feeds](https://github.com/michaelnisi/pickup#eventfeed):
 ```js
 var resumer = require('resumer')
-  , time = require('manger').time
   , feeds = require('manger').feeds
 
-var queries = [
-  { url:'http://5by5.tv/rss', time:time(2013, 11, 11) }
-]
-
-var json = JSON.stringify(queries)
-  , stdout = process.stdout
-
-resumer().queue(json)
-  .pipe(feeds())
-  .pipe(stdout)
+resumer().queue(json())
+  .pipe(feeds(db()))
+  .pipe(process.stdout)
 ```
 
 Stream [entries](https://github.com/michaelnisi/pickup#evententry):
 ```js
 var resumer = require('resumer')
-  , time = require('manger').time
-  , entries = require('entries').entries
+  , entries = require('manger').entries
 
-var queries = [
+resumer().queue(json())
+  .pipe(entries(db()))
+  .pipe(process.stdout)
+```
+
+json()
+```js
+JSON.stringify(queries())
+```
+queries()
+```js
+[
   { url:'http://5by5.tv/rss', time:time(2013, 11, 11) }
 ]
-
-var json = JSON.stringify(queries)
-  , stdout = process.stdout
-
-resumer().queue(json)
-  .pipe(entries())
-  .pipe(stdout)
 ```
-## Installation
+db()
+```js
+levelup('./mydb')
+```
 
 ## License
 
