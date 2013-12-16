@@ -2,6 +2,23 @@
 var test = require('tap').test
   , manger = require('../')
 
+test('tuple from term', function (t) {
+  var f = manger.tuple
+  var expected = [
+    ['http://5by5.tv/rss', 1970, 0,  1, 0,  0,  0]
+  , ['http://5by5.tv/rss', 1970, 0,  1, 0,  0,  0]
+  , ['http://5by5.tv/rss', 1970, 0, 17, 1, 18, 26]
+  ]
+  ;[
+    {url:'http://5by5.tv/rss'}
+  , {url:'http://5by5.tv/rss', since:0}
+  , {url:'http://5by5.tv/rss', since:1387106898}
+  ].forEach(function (term, i) {
+    t.deepEqual(f(term), expected[i])
+  })
+  t.end()
+})
+
 test('key from Date', function (t) {
   var actual = [
     manger.keyFromDate(new Date('Dec 08, 2013'))
@@ -11,7 +28,7 @@ test('key from Date', function (t) {
     '2013\x0012\x0008'
   , '2013\x0001\x0012'
   ]
-  t.deepEqual(actual, expected, 'should be expected')
+  t.deepEqual(actual, expected)
   t.end()
 })
 

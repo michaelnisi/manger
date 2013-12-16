@@ -1,12 +1,9 @@
 
-// manger - proxy feeds
+// manger - cache feeds
 
 module.exports.feeds = FeedStream
 module.exports.entries = EntryStream
 module.exports.update = update
-module.exports.time = time
-
-module.exports.tupleFromUrl = tupleFromUrl // TODO: remove
 
 if (process.env.NODE_TEST) {
   module.exports.keyFromDate = keyFromDate
@@ -17,6 +14,8 @@ if (process.env.NODE_TEST) {
   module.exports.getFeed = getFeed
   module.exports.putEntry = putEntry
   module.exports.getEntry = getEntry
+  module.exports.tupleFromUrl = tupleFromUrl
+  module.exports.tuple = tuple
 }
 
 var createHash = require('crypto').createHash
@@ -56,25 +55,49 @@ FeedStream.prototype._transform = function (uri, enc, cb) {
 util.inherits(EntryStream, Transform)
 function EntryStream (db) {
   if (!(this instanceof EntryStream)) return new EntryStream(db)
-  Transform.call(this, { objectMode:true })
+  Transform.call(this)
   this.db = db
   this.state = 0
+  this.extra = null
 }
 
-// expects tuples of the form ['url', 'year', 'month', 'day']
-// where all but url is optional
-EntryStream.prototype._transform = function (tuple, enc, cb) {
-  if (this.state === 0) {
-    this.push('{"r":[')
-    this.state = 1
+EntryStream.prototype.parse = function (chunk, cb) {
+  var con
+  if (this.extra) {
+    con = this.extra += chunk.toString()
+    this.extra = null
+  } else {
+    con = chunk.toString()
   }
-  var uri = tuple[0]
-    , isCached = false
-    , me = this
-  getFeed(this.db, uri, function (er, val) {
-    if (val) assert(typeof val === 'string')
-    isCached = !!val
-    isCached ? me.retrieve(tuple, cb) : me.request(tuple, cb)
+  var start = end = 0
+  while (end < con.length) {
+    var split = -1
+      , buf = con.charAt(end++)
+    if (buf === '}') split = end
+    if (split > -1) {
+      var thing = con.substr(start, end)
+      var term = JSON.parse(thing.substr(1, thing.indexOf('}')))
+      cb(tuple(term))
+      start = end
+    }
+    this.extra = con.substr(start, con.length)
+  }
+}
+
+EntryStream.prototype._transform = function (chunk, enc, cb) {
+  var me = this
+  me.parse(chunk, function (tuple) {
+    if (me.state === 0) {
+      me.push('"r":{[')
+      me.state = 1
+    }
+    var uri = tuple[0]
+      , isCached = false
+    getFeed(me.db, uri, function (er, val) {
+      if (val) assert(typeof val === 'string')
+      isCached = !!val
+      isCached ? me.retrieve(tuple, cb) : me.request(tuple, cb)
+    })
   })
 }
 
@@ -98,6 +121,7 @@ EntryStream.prototype.retrieve = function (tuple, cb) {
 }
 
 EntryStream.prototype.request = function (tuple, cb) {
+  console.log('request')
   var uri = tuple[0]
     , me = this
   http.get(['http://', uri].join(''), function (res) {
@@ -109,7 +133,7 @@ EntryStream.prototype.request = function (tuple, cb) {
       })
       .on('feed', function (feed) {
         var str = JSON.stringify(feed)
-        me.putFeed(uri, str, function (er) {
+        putFeed(me.db, uri, str, function (er) {
           if (er) console.error(er)
         })
       })
@@ -118,7 +142,7 @@ EntryStream.prototype.request = function (tuple, cb) {
         var str = me.prepend(JSON.stringify(entry))
         var date = entry.updated ? new Date(entry.updated) : new Date()
         if (newer(date, tuple)) me.push(str)
-        me.putEntry(uri, entry, function (er) {
+        putEntry(me.db, uri, entry, function (er) {
           if (er) console.error(er)
         })
       })
@@ -237,13 +261,15 @@ function update (db) {
   console.error('not implemented')
 }
 
-function time (year, month, day, h, m, s, ms) {
-  year = year || 0
-  month = month || 0
-  day = day || 0
-  h = h || 0
-  m = m || 0
-  s = s || 0
-  ms = ms || 0
-  return new Date(year, month, day, h, m, s, ms).getTime()
+function tuple (term) {
+  var url = term.url
+    , since = term.since || 0
+  var date = new Date(since)
+    , year = date.getUTCFullYear()
+    , month = date.getUTCMonth()
+    , day = date.getUTCDate()
+    , hours = date.getUTCHours()
+    , min = date.getUTCMinutes()
+    , sec = date.getUTCSeconds()
+  return [url, year, month, day, hours, min, sec]
 }
