@@ -9,20 +9,20 @@ The manger [Node.js](http://nodejs.org/) module caches RSS and Atom formatted XM
 ### Stream [entries](https://github.com/michaelnisi/pickup#evententry):
 ```js
 var entries = require('manger').entries
+  , levelup = require('levelup')
 
 json()
   .pipe(entries(db()))
   .pipe(process.stdout)
-```
 
-#### `json()`
-```js
-'[{ "url":"http://5by5.tv/rss", "since":1388530800000 }]'
-```
+function json () {
+  // Readable stream of JSON in the format:
+  // '[{ "url":"http://5by5.tv/rss", "since":1388530800000 }]'
+}
 
-#### `db()`
-```js
-levelup('./mydb')
+function db () {
+  return levelup('./mydb')
+}
 ```
 
 ## License
