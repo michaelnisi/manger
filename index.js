@@ -85,7 +85,7 @@ EntryStream.prototype.parse = function (chunk) {
     if (buf === 125) split = end
     if (split > -1) {
       var str = decode(con.slice(start, end))
-      // Assume we have a complete term
+      // assume we have a complete term
       var term = JSON.parse(str.substr(1, str.indexOf('}')))
       start = end
       res = tuple(term)
@@ -102,10 +102,14 @@ EntryStream.prototype._transform = function (chunk, enc, cb) {
     var uri = tuple[0]
     getFeed(me.db, uri, function (er, val) {
       var isCached = !this.forced && !!val
-      isCached ? me.retrieve(tuple, cb) : me.request(tuple, cb)
+      var _cb = function () {
+        me.state = 1
+        cb()
+      }
+      isCached ? me.retrieve(tuple, _cb) : me.request(tuple, _cb)
     })
-  } else {
-    cb() // need more
+  } else { // need more
+    cb()
   }
 }
 
@@ -116,7 +120,7 @@ EntryStream.prototype._flush = function (cb) {
 
 EntryStream.prototype.retrieve = function (tuple, cb) {
   var start = [ENT, keyFromTuple(tuple)].join(DIV)
-  var end = [ENT, keyFromUri(tuple[0]),keyFromDate(new Date())].join(DIV)
+  var end = [ENT, keyFromUri(tuple[0]), keyFromDate(new Date())].join(DIV)
   var stream = this.db.createReadStream({start:start, end:end})
   var me = this
   stream.on('data', function (data) {
@@ -124,7 +128,6 @@ EntryStream.prototype.retrieve = function (tuple, cb) {
     me.push(str)
   })
   stream.on('end', function (er) {
-    // TODO: Next
     cb()
   })
 }
@@ -161,11 +164,11 @@ EntryStream.prototype.request = function (tuple, cb) {
 })
 }
 
-var mods = ['[', ',', '']
+var mods = ['[', ','] // thought we'd need more
 EntryStream.prototype.prepend = function (str) {
   var mod = mods[this.state]
-    , s = mod + s
-  if (this.state < 2) this.state++
+    , s = mod + str
+  if (this.state === 0) this.state = 1
   return s
 }
 

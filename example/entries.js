@@ -22,8 +22,12 @@ function go () {
       end = start + 8
       if (end > len) end = len
       chunk = buf.slice(start, end)
-      ok = writer.write(chunk)
-      start += 8
+      if (end === len) { // last time
+        writer.end(chunk)
+      } else {
+        ok = writer.write(chunk)
+        start += 8
+      }
     } while (end < len && ok)
     if (end < len) {
       write.once('drain', write)
@@ -34,6 +38,7 @@ function go () {
 function terms () {
   return [
     { url:"feeds.muleradio.net/thetalkshow", since:time(2013, 12) }
+  , { url:"5by5.tv/rss", since:time(2013 , 12) }
   ]
 }
 
