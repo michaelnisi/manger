@@ -15,12 +15,12 @@ json()
   .pipe(process.stdout)
 ```
 
-### `json()`
+#### `json()`
 ```js
 '[{ "url":"http://5by5.tv/rss", "since":1388530800000 }]'
 ```
 
-### `db()`
+#### `db()`
 ```js
 levelup('./mydb')
 ```
