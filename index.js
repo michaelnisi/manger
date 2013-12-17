@@ -135,33 +135,31 @@ EntryStream.prototype.retrieve = function (tuple, cb) {
 EntryStream.prototype.request = function (tuple, cb) {
   var uri = tuple[0]
     , me = this
-    http.get(['http://', uri].join(''), function (res) {
-        res
-        .pipe(pickup())
-        .on('error', function (er) {
-          console.error(er)
-          cb()
+  http.get(['http://', uri].join(''), function (res) {
+    res.pipe(pickup())
+      .on('error', function (er) {
+        console.error(er)
+        cb()
+      })
+      .on('feed', function (feed) {
+        var str = JSON.stringify(feed)
+        putFeed(me.db, uri, str, function (er) {
+          if (er) console.error(er)
         })
-        .on('feed', function (feed) {
-          var str = JSON.stringify(feed)
-          putFeed(me.db, uri, str, function (er) {
-            if (er) console.error(er)
-          })
+      })
+      .on('entry', function (entry) {
+        entry.feed = uri // just so we know
+        var str = me.prepend(JSON.stringify(entry))
+        var date = entry.updated ? new Date(entry.updated) : new Date()
+        if (newer(date, tuple)) me.push(str)
+        putEntry(me.db, uri, entry, function (er) {
+          if (er) console.error(er)
         })
-        .on('entry', function (entry) {
-          entry.feed = uri // just so we know
-          var str = me.prepend(JSON.stringify(entry))
-          var date = entry.updated ? new Date(entry.updated) : new Date()
-          if (newer(date, tuple)) me.push(str)
-          putEntry(me.db, uri, entry, function (er) {
-            if (er) console.error(er)
-          })
-        })
-        .on('finish', function () {
-          // TODO: Next
-          cb()
-        }).resume()
-})
+      })
+      .on('finish', function () {
+        cb()
+      }).resume()
+  })
 }
 
 var mods = ['[', ','] // thought we'd need more
@@ -176,52 +174,50 @@ EntryStream.prototype.prepend = function (str) {
 
 function tupleFromUrl (uri) {
   if (!uri || uri === '/') return null
-    function indexOfFirstInt (tokens) {
-      var i = 0
-        while (i++ < tokens.length) {
-          if (!isNaN(parseInt(tokens[i]))) return i
-        }
-      return tokens.length
+  function indexOfFirstInt (tokens) {
+    var i = 0
+    while (i++ < tokens.length) {
+      if (!isNaN(parseInt(tokens[i]))) return i
     }
+    return tokens.length
+  }
   var tokens = uri.split('/')
-    var fi = indexOfFirstInt(tokens)
-    var urlToken = tokens.slice(0, fi).join('/')
-    var tupleToken = tokens.slice(fi, tokens.length)
-    var tuple = [].concat(urlToken, tupleToken)
-    return tuple
+  var fi = indexOfFirstInt(tokens)
+  var urlToken = tokens.slice(0, fi).join('/')
+  var tupleToken = tokens.slice(fi, tokens.length)
+  var tuple = [].concat(urlToken, tupleToken)
+  return tuple
 }
 
 function newer (date, tuple) {
   var e = tupleFromDate(date)
-    var y2 = e[0]
-    , m2 = e[1]
-    , d2 = e[2]
-    var y1 = tuple[1] || 1970
-    , m1 = tuple[2] || 1
-    , d1 = tuple[3] || 1
-    if (y1 < y2) return true
-      if (y1 == y2) {
-        if (m1 < m2) return true
-          if (m1 > m2) return false
-            if (m1 == m2) {
-              return d1 < d2
-            }
-      }
+  var y2 = e[0]
+  , m2 = e[1]
+  , d2 = e[2]
+  var y1 = tuple[1] || 1970
+  , m1 = tuple[2] || 1
+  , d1 = tuple[3] || 1
+  if (y1 < y2) return true
+  if (y1 == y2) {
+    if (m1 < m2) return true
+    if (m1 > m2) return false
+    if (m1 == m2) return d1 < d2
+  }
   return false
 }
 
 function tupleFromDate (date) {
   date = date || new Date()
-    var y = date.getFullYear()
-    , m = date.getMonth() + 1
-    , d = date.getDate()
-    return [y, m, d]
+  var y = date.getFullYear()
+  , m = date.getMonth() + 1
+  , d = date.getDate()
+  return [y, m, d]
 }
 
 function keyFromDate (date) {
   var tuple = tupleFromDate(date)
-    var key = formatDateTuple(tuple)
-    return key
+  var key = formatDateTuple(tuple)
+  return key
 }
 
 function keyFromUri (uri) {
@@ -230,37 +226,37 @@ function keyFromUri (uri) {
 
 function formatDateTuple (tuple) {
   var strs = []
-    var str
-    tuple.forEach(function (term) {
-      str = term + ''
-      if (str.length < 2) str = '0' + str
-      strs.push(str)
-    })
+  var str
+  tuple.forEach(function (term) {
+    str = term + ''
+    if (str.length < 2) str = '0' + str
+    strs.push(str)
+  })
   return strs.join(DIV)
 }
 
 function keyFromTuple (tuple) {
   var tokens = tuple.slice(0)
-    var uri = keyFromUri(tokens.shift())
-    var date = formatDateTuple(tokens)
-    return [uri, date].join(DIV)
+  var uri = keyFromUri(tokens.shift())
+  var date = formatDateTuple(tokens)
+  return [uri, date].join(DIV)
 }
 
 function putEntry (db, uri, entry, cb) {
   var date = new Date(entry.updated)
-    var key = [
-    ENT
-    , keyFromUri(uri)
-    , keyFromDate(date)
-    ].join(DIV)
-    db.put(key, JSON.stringify(entry), function (er) {
-      cb(er, key)
-    })
+  var key = [
+  ENT
+  , keyFromUri(uri)
+  , keyFromDate(date)
+  ].join(DIV)
+  db.put(key, JSON.stringify(entry), function (er) {
+    cb(er, key)
+  })
 }
 
 function getEntry(db, tuple, cb) {
   var key = [ENT, keyFromTuple(tuple)].join(DIV)
-    db.get(key, cb)
+  db.get(key, cb)
 }
 
 function putFeed(db, uri, feed, cb) {

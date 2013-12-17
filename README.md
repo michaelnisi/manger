@@ -6,37 +6,21 @@ The manger [Node.js](http://nodejs.org/) module caches RSS and Atom formatted XM
 
 ## Usage
 
-Stream [feeds](https://github.com/michaelnisi/pickup#eventfeed):
+### Stream [entries](https://github.com/michaelnisi/pickup#evententry):
 ```js
-var resumer = require('resumer')
-  , feeds = require('manger').feeds
+var entries = require('manger').entries
 
-resumer().queue(json())
-  .pipe(feeds(db()))
-  .pipe(process.stdout)
-```
-
-Stream [entries](https://github.com/michaelnisi/pickup#evententry):
-```js
-var resumer = require('resumer')
-  , entries = require('manger').entries
-
-resumer().queue(json())
+json()
   .pipe(entries(db()))
   .pipe(process.stdout)
 ```
 
-json()
+### `json()`
 ```js
-JSON.stringify(queries())
+'[{ "url":"http://5by5.tv/rss", "since":1388530800000 }]'
 ```
-queries()
-```js
-[
-  { url:'http://5by5.tv/rss', time:new Date(2013, 12, 11).getTime() }
-]
-```
-db()
+
+### `db()`
 ```js
 levelup('./mydb')
 ```
