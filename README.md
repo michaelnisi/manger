@@ -12,12 +12,16 @@ var entries = require('manger').entries
   , levelup = require('levelup')
 
 json()
-  .pipe(entries(db()))
+  .pipe(entries(opts()))
   .pipe(process.stdout)
 
 function json () {
   // Readable stream of JSON in the format:
   // '[{ "url":"http://5by5.tv/rss", "since":1388530800000 }]'
+}
+
+function opts () {
+  return { db:db() }
 }
 
 function db () {
