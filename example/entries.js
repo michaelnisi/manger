@@ -2,18 +2,41 @@
 // entries - stream entries
 
 var entries = require('../').entries
-  , resumer = require('resumer')
+  , time = require('../').time
   , levelup = require('levelup')
 
-resumer()
-  .queue(json())
-  .pipe(entries(db()))
-  .pipe(process.stdout)
+var writer = entries(opts)
+writer.pipe(process.stdout)
+go()
 
-function json () {
-  return '[{"url":"5by5.tv/rss", "since":0}]'
+function go () {
+  var buf = new Buffer(json())
+    , start = 0
+    , end = 0
+    , chunk = null
+  write()
+  function write () {
+    var ok = true
+      , len = buf.length
+    do {
+      end = start + 8
+      if (end > len) end = len
+      chunk = buf.slice(start, end)
+      ok = writer.write(chunk)
+      start += 8
+    } while (start < len && ok)
+    if (end < len) {
+      write.once('drain', write)
+    }
+  }
 }
 
-function db () {
-  return levelup('./mydb')
+function terms () {
+  return [
+    { url:"feeds.muleradio.net/thetalkshow", since:time(2013, 12) }
+  ]
 }
+
+function opts () { return { db:db() } }
+function json () { return JSON.stringify(terms()) }
+function db () { return levelup('/tmp/mangerdb') }

@@ -2,6 +2,19 @@
 var test = require('tap').test
   , manger = require('../')
 
+test('time', function (t) {
+  var f = manger.time
+  var expected = [
+    0
+  ]
+  ;[
+    f(1970, 0, 1, 0, 0, 0)
+  ].forEach(function (term, i) {
+    t.deepEqual(term, expected[i])
+  })
+  t.end()
+})
+
 test('tuple from term', function (t) {
   var f = manger.tuple
   var expected = [
