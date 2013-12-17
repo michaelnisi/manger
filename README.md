@@ -1,4 +1,4 @@
-# manger - cache feeds (WIP) 
+# manger - cache feeds 
 
 The manger [Node.js](http://nodejs.org/) module caches RSS and Atom formatted XML feeds using [LevelDB](https://github.com/rvagg/node-levelup).
 
@@ -23,6 +23,11 @@ function json () {
 function db () {
   return levelup('./mydb')
 }
+```
+
+To try this from the command-line:
+```
+node example/entries.js | json
 ```
 
 ## License
