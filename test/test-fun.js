@@ -2,6 +2,7 @@
 var test = require('tap').test
   , manger = require('../')
 
+/*
 test('time', function (t) {
   var f = manger.time
   var expected = [
@@ -14,6 +15,7 @@ test('time', function (t) {
   })
   t.end()
 })
+*/
 
 test('tuple from term', function (t) {
   var f = manger.tuple

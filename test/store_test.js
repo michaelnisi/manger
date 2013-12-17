@@ -12,8 +12,8 @@ var test = require('tap').test
   , child_process = require('child_process')
   , Writable = require('stream').Writable
   , manger = require('../')
-  , EntryStream = require('../').EntryStream
-  , FeedStream  = require('../').FeedStream
+  , entries = require('../').entries
+  , feeds = require('../').feeds
 
 var dir = '/tmp/manger-' + Math.floor(Math.random() * (1<<24))
   , loc = join(dir, 'test.db')
@@ -77,9 +77,10 @@ test('get feed', function (t) {
   })
 })
 
+/*
 test('write', function (t) {
   var db = levelup(loc)
-  var stream = new EntryStream(db)
+  var stream = entries(db)
   var tuples = [
     ['localhost:1337/nyt.xml', 2013, 10]
   ]
@@ -109,7 +110,7 @@ test('write', function (t) {
   })
   write()
 })
-
+*/
 test('teardown', function (t) {
   rimraf(dir, function (err) {
     fs.stat(dir, function (err) {
