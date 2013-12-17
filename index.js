@@ -25,6 +25,7 @@ var createHash = require('crypto').createHash
   , Transform = require('stream').Transform
   , util = require('util')
   , assert = require('assert')
+  , StringDecoder = require('string_decoder').StringDecoder
   , url = require('url')
 
 var ENT = 'ent' // ent\x00hash(feed_url)\x00YYYY\x00MM\x00DD
@@ -63,49 +64,49 @@ function EntryStream (opts) {
   this.forced = !!opts.forced
   this.state = 0
   this.extra = null
+  this.queue = []
 }
 
-// TODO: Rewrite this mess
 EntryStream.prototype.parse = function (chunk) {
-  var con
+  var con = null
   if (this.extra) {
-    con = this.extra += chunk.toString()
+    var tl = this.extra.length + chunk.length
+    con = Buffer.concat([this.extra, chunk], tl)
     this.extra = null
   } else {
-    con = chunk.toString()
+    con = chunk
   }
-  var start = end = 0
+  var start = 0
+    , end = 0
+    , res = null
   while (end < con.length) {
     var split = -1
-      , buf = con.charAt(end++)
-    if (buf === '}') split = end
+      , buf = con[end++]
+    if (buf === 125) split = end
     if (split > -1) {
-      var thing = con.substr(start, end)
-      var term = JSON.parse(thing.substr(1, thing.indexOf('}')))
-      return tuple(term)
-        start = end
+      var str = decode(con.slice(start, end))
+      // Assume we have a complete term
+      var term = JSON.parse(str.substr(1, str.indexOf('}')))
+      start = end
+      res = tuple(term)
     }
-    this.extra = con.substr(start, con.length)
+    this.extra = con.slice(start, con.length)
   }
-  return null
+  return res
 }
 
 EntryStream.prototype._transform = function (chunk, enc, cb) {
   var me = this
     , tuple = me.parse(chunk)
   if (tuple) {
-    me.push('get ' + tuple[0] +'\n')
-  }
-  cb()
-  return
-
-  me.parse(chunk, function (tuple) {
     var uri = tuple[0]
     getFeed(me.db, uri, function (er, val) {
       var isCached = !this.forced && !!val
       isCached ? me.retrieve(tuple, cb) : me.request(tuple, cb)
     })
-  })
+  } else {
+    cb() // need more
+  }
 }
 
 EntryStream.prototype._flush = function (cb) {
@@ -296,3 +297,9 @@ function time (year, month, day, h, m, s, ms) {
   ms = ms || 0
   return new Date(year, month, day, h, m, s, ms).getTime()
 }
+
+var decoder = new StringDecoder()
+function decode (buf) {
+  return decoder.write(buf)
+}
+
