@@ -115,13 +115,6 @@ EntryStream.prototype._transform = function (chunk, enc, cb) {
   }
 }
 
-function stale (val, mode) {
-  var cached = !!val
-    , fresh  = mode === 1
-    , cache  = mode === 2
-  return (!cached || fresh) && !cache
-}
-
 EntryStream.prototype._flush = function (cb) {
   var chunk = this.state === 0 ? '[]' : ']'
   this.push(chunk)
