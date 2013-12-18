@@ -22,6 +22,7 @@ if (process.env.NODE_TEST) {
 }
 
 var createHash = require('crypto').createHash
+  , assert = require('assert')
   , pickup = require('pickup')
   , http = require('http')
   , Transform = require('stream').Transform
@@ -123,10 +124,12 @@ EntryStream.prototype._flush = function (cb) {
 EntryStream.prototype.retrieve = function (tuple, cb) {
   var start = [ENT, keyFromTuple(tuple)].join(DIV)
   var end = [ENT, keyFromUri(tuple[0]), keyFromDate(new Date())].join(DIV)
-  var stream = this.db.createReadStream({start:start, end:end})
+  assert(this.db.isOpen())
+
+  var stream = this.db.createValueStream({start:start, end:end})
   var me = this
-  stream.on('data', function (data) {
-    var str = me.prepend(data.value)
+  stream.on('data', function (value) {
+    var str = me.prepend(value)
     me.push(str)
   })
   stream.on('end', function (er) {
@@ -182,8 +185,21 @@ function ReadableString (str) {
 }
 
 ReadableString.prototype._read = function (size) {
-  // TODO: Read buffer to end
-  this.push(null)
+  var ok = true
+    , chunk = null
+    , end = 0
+  do {
+    var buf = this.buf
+    if (buf === null || buf.length === 0) {
+      this.push(null)
+      break
+    }
+    end = size || buf.length
+    if (end > buf.length) end = buf.length
+    chunk = buf.slice(0, end)
+    ok = this.push(chunk)
+    this.buf = buf.slice(end, buf.length - end)
+  } while (ok && end > 0)
 }
 
 // Details

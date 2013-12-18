@@ -42,8 +42,6 @@ node example/entries.js | json
 
 ### update(opts)
 
-### time(year, month, day, hour, minutes, seconds)
-
 ## Installation
 
 [![NPM](https://nodei.co/npm/manger.png)](https://npmjs.org/package/manger)
