@@ -14,6 +14,9 @@
     "type": "git",
     "url": "git://github.com/michaelnisi/manger.git"
   },
+  "bugs": {
+    "url": "https://github.com/michaelnisi/manger/issues"
+  },
   "keywords": [
     "rss",
     "atom",
@@ -25,14 +28,14 @@
     "proxy"
   ],
   "dependencies": {
-    "pickup": "0.2.x"
+    "pickup": "0.3.x"
   },
   "devDependencies": {
     "rimraf": "2.2.x",
     "st": "0.2.x",
     "tap": "0.4.x",
-    "levelup": "0.9.x",
-    "leveldown": "0.5.x"
+    "levelup": "0.18.x",
+    "leveldown": "0.10.x"
   },
   "engines": {
     "node": "0.11.x",

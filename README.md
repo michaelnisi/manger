@@ -44,6 +44,10 @@ node example/entries.js | json
 
 ### time(year, month, day, hour, minutes, seconds)
 
+## Installation
+
+[![NPM](https://nodei.co/npm/manger.png)](https://npmjs.org/package/manger)
+
 ## License
 
 [MIT License](https://raw.github.com/michaelnisi/manger/master/LICENSE)

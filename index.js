@@ -172,7 +172,7 @@ EntryStream.prototype.prepend = function (str) {
   return s
 }
 
-// String
+// ReadableString
 
 util.inherits(ReadableString, Transform)
 function ReadableString (str) {
