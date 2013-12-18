@@ -4,6 +4,7 @@
 module.exports.feeds = FeedStream
 module.exports.entries = EntryStream
 module.exports.update = update
+
 module.exports.rstr = ReadableString
 
 if (process.env.NODE_TEST) {
@@ -103,11 +104,7 @@ EntryStream.prototype._transform = function (chunk, enc, cb) {
     var uri = tuple[0]
     getFeed(me.db, uri, function (er, val) {
       var isCached = !this.forced && !!val
-      var _cb = function () {
-        me.state = 1
-        cb()
-      }
-      isCached ? me.retrieve(tuple, _cb) : me.request(tuple, _cb)
+      isCached ? me.retrieve(tuple, cb) : me.request(tuple, cb)
     })
   } else { // need more
     cb()
@@ -115,7 +112,8 @@ EntryStream.prototype._transform = function (chunk, enc, cb) {
 }
 
 EntryStream.prototype._flush = function (cb) {
-  this.push(']')
+  var chunk = this.state === 0 ? '[]' : ']'
+  this.push(chunk)
   cb()
 }
 
