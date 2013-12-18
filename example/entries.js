@@ -2,7 +2,6 @@
 // entries - stream entries
 
 var entries = require('../').entries
-  , time = require('../').time
   , levelup = require('levelup')
 
 var writer = entries(opts())
@@ -37,8 +36,8 @@ function go () {
 
 function terms () {
   return [
-    { url:"feeds.muleradio.net/thetalkshow", since:time(2013, 12) }
-  , { url:"5by5.tv/rss", since:time(2013 , 12) }
+    { url:"feeds.muleradio.net/thetalkshow", since:Date.UTC(2013, 11)}
+  , { url:"5by5.tv/rss", since:Date.UTC(2013, 11) }
   ]
 }
 

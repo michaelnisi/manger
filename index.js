@@ -4,8 +4,6 @@
 module.exports.feeds = FeedStream
 module.exports.entries = EntryStream
 module.exports.update = update
-
-module.exports.time = time
 module.exports.rstr = ReadableString
 
 if (process.env.NODE_TEST) {
@@ -317,18 +315,6 @@ function tuple (term) {
     , min = date.getUTCMinutes()
     , sec = date.getUTCSeconds()
   return [url, year, month, day, hours, min, sec]
-}
-
-function time (year, month, day, h, m, s, ms) {
-  year = year || 1970
-  if (year < 1970) year = 1970
-  month = month || 0
-  day = day || 1
-  h = h || 0
-  m = m || 0
-  s = s || 0
-  ms = ms || 0
-  return Date.UTC(year, month, day, h, m, s, ms)
 }
 
 var decoder = new StringDecoder()
