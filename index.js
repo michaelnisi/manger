@@ -18,6 +18,7 @@ if (process.env.NODE_TEST) {
   module.exports.getEntry = getEntry
   module.exports.tupleFromUrl = tupleFromUrl
   module.exports.tuple = tuple
+  module.exports.stale = stale
 }
 
 var createHash = require('crypto').createHash
@@ -103,12 +104,22 @@ EntryStream.prototype._transform = function (chunk, enc, cb) {
   if (tuple) {
     var uri = tuple[0]
     getFeed(me.db, uri, function (er, val) {
-      var isCached = this.mode !== 1 && !!val
-      isCached ? me.retrieve(tuple, cb) : me.request(tuple, cb)
+      if (stale(val, this.mode)) {
+        me.request(tuple, cb)
+      } else {
+        me.retrieve(tuple, cb)
+      }
     })
   } else { // need more
     cb()
   }
+}
+
+function stale (val, mode) {
+  var cached = !!val
+    , fresh  = mode === 1
+    , cache  = mode === 2
+  return (!cached || fresh) && !cache
 }
 
 EntryStream.prototype._flush = function (cb) {
@@ -318,3 +329,9 @@ function decode (buf) {
   return decoder.write(buf)
 }
 
+function stale (val, mode) {
+  var cached = !!val
+    , fresh  = mode === 1
+    , cache  = mode === 2
+  return (!cached || fresh) && !cache
+}
