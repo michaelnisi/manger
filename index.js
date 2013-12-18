@@ -4,7 +4,9 @@
 module.exports.feeds = FeedStream
 module.exports.entries = EntryStream
 module.exports.update = update
+
 module.exports.time = time
+module.exports.rstr = ReadableString
 
 if (process.env.NODE_TEST) {
   module.exports.keyFromDate = keyFromDate
@@ -44,6 +46,7 @@ function FeedStream (db) {
 
 FeedStream.prototype._transform = function (uri, enc, cb) {
   var me = this
+  // TODO: parse
   getFeed(this.db, uri, function (er, feed) {
     if (feed) {
       me.push(feed)
@@ -64,7 +67,6 @@ function EntryStream (opts) {
   this.forced = !!opts.forced
   this.state = 0
   this.extra = null
-  this.queue = []
 }
 
 EntryStream.prototype.parse = function (chunk) {
@@ -170,6 +172,20 @@ EntryStream.prototype.prepend = function (str) {
   return s
 }
 
+// String
+
+util.inherits(ReadableString, Transform)
+function ReadableString (str) {
+  if (!(this instanceof ReadableString)) return new ReadableString(str)
+  Transform.call(this)
+  this.buf = new Buffer(str)
+}
+
+ReadableString.prototype._read = function (size) {
+  // TODO: Read buffer to end
+  this.push(null)
+}
+
 // Details
 
 function tupleFromUrl (uri) {
@@ -192,11 +208,11 @@ function tupleFromUrl (uri) {
 function newer (date, tuple) {
   var e = tupleFromDate(date)
   var y2 = e[0]
-  , m2 = e[1]
-  , d2 = e[2]
+    , m2 = e[1]
+    , d2 = e[2]
   var y1 = tuple[1] || 1970
-  , m1 = tuple[2] || 1
-  , d1 = tuple[3] || 1
+    , m1 = tuple[2] || 1
+    , d1 = tuple[3] || 1
   if (y1 < y2) return true
   if (y1 == y2) {
     if (m1 < m2) return true
@@ -209,8 +225,8 @@ function newer (date, tuple) {
 function tupleFromDate (date) {
   date = date || new Date()
   var y = date.getFullYear()
-  , m = date.getMonth() + 1
-  , d = date.getDate()
+    , m = date.getMonth() + 1
+    , d = date.getDate()
   return [y, m, d]
 }
 
@@ -270,6 +286,7 @@ function getFeed (db, uri, cb) {
 }
 
 function update (db) {
+  // TODO: Iterate all feeds
   console.error('not implemented')
 }
 
@@ -287,14 +304,15 @@ function tuple (term) {
 }
 
 function time (year, month, day, h, m, s, ms) {
-  year = year || 0
+  year = year || 1970
+  if (year < 1970) year = 1970
   month = month || 0
-  day = day || 0
+  day = day || 1
   h = h || 0
   m = m || 0
   s = s || 0
   ms = ms || 0
-  return new Date(year, month, day, h, m, s, ms).getTime()
+  return Date.UTC(year, month, day, h, m, s, ms)
 }
 
 var decoder = new StringDecoder()

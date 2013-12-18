@@ -34,6 +34,16 @@ To try this from the command-line:
 node example/entries.js | json
 ```
 
+## API
+
+### entries(opts)
+
+### feeds(opts)
+
+### update(opts)
+
+### time(year, month, day, hour, minutes, seconds)
+
 ## License
 
 [MIT License](https://raw.github.com/michaelnisi/manger/master/LICENSE)
