@@ -75,7 +75,8 @@ test('put/get feed', function (t) {
 test('pipe entries', function (t) {
   function json () {
     return JSON.stringify([
-      { url:'localhost:1337/nyt.xml', since:Date.UTC(2013, 9) }
+      { url:'localhost:1337/logbuch-netzpolitik.xml'
+      , since:Date.UTC(2013, 9) }
     ])
   }
   var writer = entries(opts())
@@ -83,11 +84,19 @@ test('pipe entries', function (t) {
 
   reader
     .pipe(writer)
-    .on('finish', go)
+    .on('finish', retrieve)
 
-  function go () {
-    // TODO: Cached?
-    t.end()
+  var actual = []
+  function retrieve () {
+    rstr(json())
+      .pipe(entries({ db:db(), mode:2 }))
+      .on('data', function (data) {
+        actual.push(data)
+      })
+      .on('finish', function () {
+        t.equal(actual.length, 12)
+        t.end()
+      })
   }
 })
 

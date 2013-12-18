@@ -65,7 +65,7 @@ function EntryStream (opts) {
   if (!(this instanceof EntryStream)) return new EntryStream(opts)
   Transform.call(this)
   this.db = opts.db
-  this.mode = opts.mode || 1 | 2 // FRESH | CACHE
+  this.mode = opts.mode || 1 | 2 // fresh | cache
   this.state = 0
   this.extra = null
 }
