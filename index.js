@@ -64,7 +64,7 @@ function EntryStream (opts) {
   if (!(this instanceof EntryStream)) return new EntryStream(opts)
   Transform.call(this)
   this.db = opts.db
-  this.forced = !!opts.forced
+  this.mode = opts.mode || 1 | 2 // FRESH | CACHE
   this.state = 0
   this.extra = null
 }
@@ -103,7 +103,7 @@ EntryStream.prototype._transform = function (chunk, enc, cb) {
   if (tuple) {
     var uri = tuple[0]
     getFeed(me.db, uri, function (er, val) {
-      var isCached = !this.forced && !!val
+      var isCached = this.mode !== 1 && !!val
       isCached ? me.retrieve(tuple, cb) : me.request(tuple, cb)
     })
   } else { // need more
@@ -120,8 +120,6 @@ EntryStream.prototype._flush = function (cb) {
 EntryStream.prototype.retrieve = function (tuple, cb) {
   var start = [ENT, keyFromTuple(tuple)].join(DIV)
   var end = [ENT, keyFromUri(tuple[0]), keyFromDate(new Date())].join(DIV)
-  assert(this.db.isOpen())
-
   var stream = this.db.createValueStream({start:start, end:end})
   var me = this
   stream.on('data', function (value) {

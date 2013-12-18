@@ -36,11 +36,15 @@ node example/entries.js | json
 
 ## API
 
-### entries(opts)
+### entries(opts())
 
-### feeds(opts)
+### feeds(opts())
 
-### update(opts)
+### update(db)
+
+### opts()
+- `db`
+- `mode` 1 | 2
 
 ## Installation
 
