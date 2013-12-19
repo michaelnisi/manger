@@ -88,8 +88,14 @@ EntryStream.prototype.parse = function (chunk) {
     if (buf === 125) split = end
     if (split > -1) {
       var str = decode(con.slice(start, end))
-      // assume we have a complete term
-      var term = JSON.parse(str.substr(1, str.indexOf('}')))
+        , term = null
+      try {
+        // assume we have a complete term
+        term = JSON.parse(str.substr(1, str.indexOf('}')))
+      } catch (er) {
+        console.error('Invalid JSON')
+        // TODO: What should we do?
+      }
       start = end
       res = tuple(term)
     }
@@ -320,15 +326,35 @@ function getFeed (db, uri, cb) {
   db.get(key, cb)
 }
 
+// Update whole store.
+// - db The database instance
 function update (db) {
-  var start = ''
-    , end = ''
-    , opts = { start:start, end:end }
-    , keys = db.createKeyStream(opts)
-  keys.setEncoding('utf8')
-  keys.on('readable', function () {
+  function keys () {
+    var start = ''
+      , end = ''
+      , opts = { start:start, end:end }
+      , keys = db.createKeyStream(opts)
+    keys.setEncoding('utf8')
+    return keys
+  }
+
+  function feeds () {
+
+  }
+
+  function entries () {
+    var opts = { db:db, mode:2 }
+      , entries = new EntryStream(opts)
+    return entries
+  }
+
+  var reader = keys()
+    , transf = feeds()
+    , writer = entries()
+
+  reader.on('readable', function () {
     var chunk
-    while (null !== (chunk = keys.read())) {
+    while (null !== (chunk = reader.read())) {
       console.error(chunk)
     }
   })
