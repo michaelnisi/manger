@@ -173,6 +173,27 @@ EntryStream.prototype.prepend = function (str) {
   return s
 }
 
+// Cached
+
+util.inherits(CachedFStream, Transform)
+function CachedFStream () {
+  if (!(this instanceof CachedFStream)) return new CachedFStream()
+  Transform.call(this)
+  if (!opts.db) throw new Error('Database required')
+  this.db = opts.db
+}
+
+CachedFStream.prototype._transform = function (chunk, enc, cb) {
+  var db = this.db
+    , start = ''
+    , end = ''
+    , opts = { start:start, end:end }
+    , keys = db.createKeyStream(opts)
+
+  this.push(null)
+}
+
+
 // ReadableString
 
 util.inherits(ReadableString, Transform)
@@ -300,8 +321,17 @@ function getFeed (db, uri, cb) {
 }
 
 function update (db) {
-  // TODO: Iterate all feeds
-  console.error('not implemented')
+  var start = ''
+    , end = ''
+    , opts = { start:start, end:end }
+    , keys = db.createKeyStream(opts)
+  keys.setEncoding('utf8')
+  keys.on('readable', function () {
+    var chunk
+    while (null !== (chunk = keys.read())) {
+      console.error(chunk)
+    }
+  })
 }
 
 function tuple (term) {

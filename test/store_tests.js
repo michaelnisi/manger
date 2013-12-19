@@ -79,15 +79,13 @@ test('pipe entries', function (t) {
       , since:Date.UTC(2013, 9) }
     ])
   }
-  var writer = entries(opts())
-  var reader = rstr(json())
 
-  reader
-    .pipe(writer)
+  rstr(json())
+    .pipe(entries(opts()))
     .on('finish', retrieve)
 
-  var actual = []
   function retrieve () {
+    var actual = []
     rstr(json())
       .pipe(entries({ db:db(), mode:2 }))
       .on('data', function (data) {
@@ -99,6 +97,7 @@ test('pipe entries', function (t) {
       })
   }
 })
+
 
 test('teardown', function (t) {
   db().close()
