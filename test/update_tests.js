@@ -25,6 +25,7 @@ test('update', function (t) {
     t.ok(!er, 'should not error')
     t.is(key, 'ent\u0000E1NEdRl1c7R5AWE/XrIr7Q==\u00002013\u000010\u000001')
     update(db())
+      .on('data', console.error)
     db().close()
     t.end()
   })

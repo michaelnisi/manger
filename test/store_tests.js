@@ -72,6 +72,7 @@ test('put/get feed', function (t) {
   })
 })
 
+/*
 test('pipe entries', function (t) {
   function json () {
     return JSON.stringify([
@@ -97,7 +98,7 @@ test('pipe entries', function (t) {
       })
   }
 })
-
+*/
 
 test('teardown', function (t) {
   db().close()

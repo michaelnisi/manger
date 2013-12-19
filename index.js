@@ -36,30 +36,50 @@ var ENT = 'ent' // ent\x00hash(feed_url)\x00YYYY\x00MM\x00DD
   , DIV = '\x00'
   , END = '\xff'
 
-// Feeds
-
+// Stream feeds
+// - opts
+//   - db The database instance
+//   - mode 1 | 2 (fresh | cache) Defaults to 1 | 2
 util.inherits(FeedStream, Transform)
-function FeedStream (db) {
+function FeedStream (opts) {
   if (!(this instanceof FeedStream)) return new FeedStream(db)
-  Transform.call(this, { objectMode:true })
-  this.db = db
+  Transform.call(this)
+  this.db = opts.db
+  this.mode = opts.mode || 1 | 2
+  this.extra = null
 }
 
-FeedStream.prototype._transform = function (uri, enc, cb) {
-  var me = this
-  // TODO: parse
-  getFeed(this.db, uri, function (er, feed) {
-    if (feed) {
-      me.push(feed)
-    } else {
-      // TODO: retrieve
-    }
+FeedStream.prototype._transform = function (chunk, enc, cb) {
+  if (chunk.readUInt8(0) === 42) { // TODO: Probably totally awesome
+    // TODO: Get all feeds in store
+    this.push(null)
     cb()
-  })
+  } else {
+    var me = this
+      , re = parse(chunk, me.extra)
+      , tuple = re[0]
+    me.extra = re[1]
+    if (tuple) {
+      var uri = tuple[0]
+      getFeed(me.db, uri, function (er, val) {
+        if (stale(val, this.mode)) {
+          me.request(tuple, cb)
+        } else {
+          console.error(val)
+          this.push(val)
+          cb()
+        }
+      })
+    } else { // need more
+      cb()
+    }
+  }
 }
 
-// Entries
-
+// Stream entries
+// - opts
+//   - db The database instance
+//   - mode 1 | 2 (fresh | cache) Defaults to 1 | 2
 util.inherits(EntryStream, Transform)
 function EntryStream (opts) {
   if (!(this instanceof EntryStream)) return new EntryStream(opts)
@@ -70,43 +90,11 @@ function EntryStream (opts) {
   this.extra = null
 }
 
-EntryStream.prototype.parse = function (chunk) {
-  var con = null
-  if (this.extra) {
-    var tl = this.extra.length + chunk.length
-    con = Buffer.concat([this.extra, chunk], tl)
-    this.extra = null
-  } else {
-    con = chunk
-  }
-  var start = 0
-    , end = 0
-    , res = null
-  while (end < con.length) {
-    var split = -1
-      , buf = con[end++]
-    if (buf === 125) split = end
-    if (split > -1) {
-      var str = decode(con.slice(start, end))
-        , term = null
-      try {
-        // assume we have a complete term
-        term = JSON.parse(str.substr(1, str.indexOf('}')))
-      } catch (er) {
-        console.error('Invalid JSON')
-        // TODO: What should we do?
-      }
-      start = end
-      res = tuple(term)
-    }
-    this.extra = con.slice(start, con.length)
-  }
-  return res
-}
-
 EntryStream.prototype._transform = function (chunk, enc, cb) {
   var me = this
-    , tuple = me.parse(chunk)
+    , re = parse(chunk, me.extra)
+    , tuple = re[0]
+  me.extra = re[1]
   if (tuple) {
     var uri = tuple[0]
     getFeed(me.db, uri, function (er, val) {
@@ -179,29 +167,19 @@ EntryStream.prototype.prepend = function (str) {
   return s
 }
 
-// Cached
-
-util.inherits(CachedFStream, Transform)
-function CachedFStream () {
-  if (!(this instanceof CachedFStream)) return new CachedFStream()
+// Transform values of stored feeds to queries
+util.inherits(QueryStream, Transform)
+function QueryStream () {
+  if (!(this instanceof QueryStream)) return new QueryStream(db)
   Transform.call(this)
-  if (!opts.db) throw new Error('Database required')
-  this.db = opts.db
 }
 
-CachedFStream.prototype._transform = function (chunk, enc, cb) {
-  var db = this.db
-    , start = ''
-    , end = ''
-    , opts = { start:start, end:end }
-    , keys = db.createKeyStream(opts)
-
-  this.push(null)
+QueryStream.prototype._transform = function (chunk, enc, cb) {
+  this.push(chunk)
 }
 
-
-// ReadableString
-
+// A readable string stream
+// - str The string to stream/read
 util.inherits(ReadableString, Transform)
 function ReadableString (str) {
   if (!(this instanceof ReadableString)) return new ReadableString(str)
@@ -227,7 +205,7 @@ ReadableString.prototype._read = function (size) {
   } while (ok && end > 0)
 }
 
-// Details
+// miscellaneous functions
 
 function tupleFromUrl (uri) {
   if (!uri || uri === '/') return null
@@ -322,6 +300,7 @@ function putFeed(db, uri, feed, cb) {
 }
 
 function getFeed (db, uri, cb) {
+  console.error('getFeed %s', uri)
   var key = [FED, keyFromUri(uri)].join(DIV)
   db.get(key, cb)
 }
@@ -329,35 +308,11 @@ function getFeed (db, uri, cb) {
 // Update whole store.
 // - db The database instance
 function update (db) {
-  function keys () {
-    var start = ''
-      , end = ''
-      , opts = { start:start, end:end }
-      , keys = db.createKeyStream(opts)
-    keys.setEncoding('utf8')
-    return keys
-  }
-
-  function feeds () {
-
-  }
-
-  function entries () {
-    var opts = { db:db, mode:2 }
-      , entries = new EntryStream(opts)
-    return entries
-  }
-
-  var reader = keys()
-    , transf = feeds()
-    , writer = entries()
-
-  reader.on('readable', function () {
-    var chunk
-    while (null !== (chunk = reader.read())) {
-      console.error(chunk)
-    }
-  })
+  var reader = new FeedStream({ db:db, mode:2 })
+    , transf = new QueryStream()
+    , writer = new EntryStream({ db:db, mode:1 })
+  reader.write('*')
+  return reader.pipe(transf)// TODO: Take care of things
 }
 
 function tuple (term) {
@@ -383,4 +338,41 @@ function stale (val, mode) {
     , fresh  = mode === 1
     , cache  = mode === 2
   return (!cached || fresh) && !cache
+}
+
+// Parse JSON
+// - chunk The buffer or string to parse
+// - rest  The rest from the previous parse (optional)
+function parse (chunk, rest) {
+  var con = null
+  if (rest) {
+    var tl = rest.length + chunk.length
+    con = Buffer.concat([rest, chunk], tl)
+    rest = null
+  } else {
+    con = chunk
+  }
+  var start = 0
+    , end = 0
+    , res = null
+  while (end < con.length) {
+    var split = -1
+      , buf = con[end++]
+    if (buf === 125) split = end
+    if (split > -1) {
+      var str = decode(con.slice(start, end))
+        , term = null
+      try {
+        // assume we have a complete term
+        term = JSON.parse(str.substr(1, str.indexOf('}')))
+      } catch (er) {
+        console.error('Invalid JSON')
+        // TODO: What should we do?
+      }
+      start = end
+      res = tuple(term)
+    }
+    rest = con.slice(start, con.length)
+  }
+  return [chunk, rest]
 }
