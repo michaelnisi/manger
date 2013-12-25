@@ -4,6 +4,7 @@ var test = require('tap').test
   , levelup = require('levelup')
   , join = require('path').join
   , fs = require('fs')
+  , assert = require('assert')
   , manger = require('../')
 
 test('setup', function (t) {
@@ -11,6 +12,7 @@ test('setup', function (t) {
   t.ok(fs.statSync(dir()).isDirectory(), 'should exist')
   levelup(loc(), null, function (er, db) {
     t.ok(!er, 'should not error')
+    t.ok(db.isOpen(), 'should be open')
     _db = db
     t.end()
   })
@@ -24,18 +26,19 @@ test('update', function (t) {
   put(db(), uri, entry(), function (er, key) {
     t.ok(!er, 'should not error')
     t.is(key, 'ent\u0000E1NEdRl1c7R5AWE/XrIr7Q==\u00002013\u000010\u000001')
-    update(db())
-      .on('data', console.error)
-    db().close()
     t.end()
   })
 })
 
 test('teardown', function (t) {
-  rimraf(dir(), function (err) {
-    fs.stat(dir(), function (err) {
-      t.ok(!!err, 'should clean up after ourselves')
-      t.end()
+  db().close(function (er) {
+    t.ok(!er, 'should not error')
+    t.ok(db().isClosed(), 'should be closed')
+    rimraf(dir(), function (er) {
+      fs.stat(dir(), function (er) {
+        t.ok(!!er, 'should clean up after ourselves')
+        t.end()
+      })
     })
   })
 })
@@ -45,7 +48,7 @@ test('teardown', function (t) {
 var _db, _dir
 
 function db () {
-  if (!_db) _db = levelup(loc())
+  assert(_db)
   return _db
 }
 

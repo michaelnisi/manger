@@ -4,8 +4,7 @@
 module.exports.feeds = FeedStream
 module.exports.entries = EntryStream
 module.exports.update = update
-
-module.exports.rstr = ReadableString
+module.exports.queries = require('./lib/queries').queries
 
 if (process.env.NODE_TEST) {
   module.exports.keyFromDate = keyFromDate
@@ -17,8 +16,8 @@ if (process.env.NODE_TEST) {
   module.exports.putEntry = putEntry
   module.exports.getEntry = getEntry
   module.exports.tupleFromUrl = tupleFromUrl
-  module.exports.tuple = tuple
   module.exports.stale = stale
+  module.exports.date = date
 }
 
 var createHash = require('crypto').createHash
@@ -30,75 +29,72 @@ var createHash = require('crypto').createHash
   , assert = require('assert')
   , StringDecoder = require('string_decoder').StringDecoder
   , url = require('url')
+  , parse = require('./lib/queries').parse
+  , tuple = require('./lib/queries').tuple
 
 var ENT = 'ent' // ent\x00hash(feed_url)\x00YYYY\x00MM\x00DD
   , FED = 'fed' // fed\x00hash(feed_url)
   , DIV = '\x00'
   , END = '\xff'
+  , ETG = 'etg'
 
-// Stream feeds
-// - opts
-//   - db The database instance
-//   - mode 1 | 2 (fresh | cache) Defaults to 1 | 2
-util.inherits(FeedStream, Transform)
-function FeedStream (opts) {
-  if (!(this instanceof FeedStream)) return new FeedStream(db)
-  Transform.call(this)
-  this.db = opts.db
-  this.mode = opts.mode || 1 | 2
-  this.extra = null
+var debug
+if (process.env.NODE_DEBUG || process.env.NODE_TEST) {
+  debug = function(x) { console.error('* manger: %s', x) }
+} else {
+  debug = function() { }
 }
 
-FeedStream.prototype._transform = function (chunk, enc, cb) {
-  if (chunk.readUInt8(0) === 42) { // TODO: Probably totally awesome
-    // TODO: Get all feeds in store
-    this.push(null)
-    cb()
-  } else {
-    var me = this
-      , re = parse(chunk, me.extra)
-      , tuple = re[0]
-    me.extra = re[1]
-    if (tuple) {
-      var uri = tuple[0]
-      getFeed(me.db, uri, function (er, val) {
-        if (stale(val, this.mode)) {
-          me.request(tuple, cb)
-        } else {
-          console.error(val)
-          this.push(val)
-          cb()
-        }
-      })
-    } else { // need more
-      cb()
-    }
-  }
-}
-
-// Stream entries
+// Abstract base class for transform streams
 // - opts
 //   - db The database instance
-//   - mode 1 | 2 (fresh | cache) Defaults to 1 | 2
-util.inherits(EntryStream, Transform)
-function EntryStream (opts) {
-  if (!(this instanceof EntryStream)) return new EntryStream(opts)
+//   - mode 1 | 2 (FRESH | CACHE) Defaults to 1 | 2
+var UPDATE_MODES = {
+  FRESH: 1
+, CACHE: 2
+}
+var MODS = ['[', ',']
+util.inherits(ATransform, Transform)
+function ATransform(opts) {
+  if (!(this instanceof ATransform)) return new ATransform(opts)
   Transform.call(this)
+  this._writableState.objectMode = true
+  this._readableState.objectMode = false // TODO: false?
+  this._pushFeeds = false
+  this._pushEntries = true
   this.db = opts.db
-  this.mode = opts.mode || 1 | 2 // fresh | cache
+  this.mode = opts.mode || 1 | 2 // FRESH | CACHE
   this.state = 0
-  this.extra = null
 }
 
-EntryStream.prototype._transform = function (chunk, enc, cb) {
+ATransform.prototype._flush = function(cb) {
+  var chunk = this.state === 0 ? '[]' : ']'
+  this.push(chunk)
+  cb()
+}
+
+// Prepend output string according to state
+ATransform.prototype.prepend = function(str) {
+  var mod = MODS[this.state]
+    , s = mod + str
+  if (this.state === 0) this.state = 1
+  return s
+}
+
+// Release resources
+ATransform.prototype.destroy = function() {
+  this.db = null
+  this.rest = null
+  release([this])
+}
+
+// Request via HTTP or retrieve from store
+ATransform.prototype._transform = function (tuple, enc, cb) {
   var me = this
-    , re = parse(chunk, me.extra)
-    , tuple = re[0]
-  me.extra = re[1]
   if (tuple) {
     var uri = tuple[0]
     getFeed(me.db, uri, function (er, val) {
-      if (stale(val, this.mode)) {
+      if (stale(val, me.mode)) {
         me.request(tuple, cb)
       } else {
         me.retrieve(tuple, cb)
@@ -109,10 +105,69 @@ EntryStream.prototype._transform = function (chunk, enc, cb) {
   }
 }
 
-EntryStream.prototype._flush = function (cb) {
-  var chunk = this.state === 0 ? '[]' : ']'
-  this.push(chunk)
-  cb()
+ATransform.prototype.request = function (tuple, cb) {
+  var uri = tuple[0]
+    , me = this
+  http.get(['http://', uri].join(''), function (res) {
+    res.pipe(pickup())
+      .on('error', function (er) {
+        console.error(er)
+        cb()
+      })
+      .on('feed', function (feed) {
+        feed.feed = uri // TODO: Better name
+        var str = me.prepend(JSON.stringify(feed))
+        if (me._pushFeeds) me.push(str)
+        putFeed(me.db, uri, feed, function (er) {
+          if (er) console.error(er)
+        })
+      })
+      .on('entry', function (entry) {
+        entry.feed = uri // just so we know
+        var str = me.prepend(JSON.stringify(entry))
+        var date = entry.updated ? new Date(entry.updated) : new Date()
+        if (me._pushEntries && newer(date, tuple)) me.push(str)
+        putEntry(me.db, uri, entry, function (er) {
+          if (er) console.error(er)
+        })
+      })
+      .on('finish', function () {
+        cb()
+      }).resume()
+  })
+}
+
+ATransform.prototype.toString = function() {
+  return ['Manger ', this.constructor.name].join()
+}
+
+// Stream feeds
+util.inherits(FeedStream, ATransform)
+function FeedStream(opts) {
+  if (!(this instanceof FeedStream)) return new FeedStream(opts)
+  ATransform.call(this, opts)
+  this._pushFeeds = true
+  this._pushEntries = false
+}
+
+FeedStream.prototype.retrieve = function (tuple, cb) {
+  var me = this
+    , key = [FED, keyFromTuple(tuple)].join(DIV)
+
+  me.db.get(key, function (er, val) {
+    if (!er && val) {
+      var str = me.prepend(val)
+      me.push(str)
+    }
+    cb()
+  })
+}
+
+// Stream entries
+util.inherits(EntryStream, ATransform)
+function EntryStream (opts) {
+  if (!(this instanceof EntryStream)) return new EntryStream(opts)
+  ATransform.call(this, opts)
 }
 
 EntryStream.prototype.retrieve = function (tuple, cb) {
@@ -129,80 +184,41 @@ EntryStream.prototype.retrieve = function (tuple, cb) {
   })
 }
 
-EntryStream.prototype.request = function (tuple, cb) {
-  var uri = tuple[0]
-    , me = this
-  http.get(['http://', uri].join(''), function (res) {
-    res.pipe(pickup())
-      .on('error', function (er) {
-        console.error(er)
-        cb()
-      })
-      .on('feed', function (feed) {
-        var str = JSON.stringify(feed)
-        putFeed(me.db, uri, str, function (er) {
-          if (er) console.error(er)
-        })
-      })
-      .on('entry', function (entry) {
-        entry.feed = uri // just so we know
-        var str = me.prepend(JSON.stringify(entry))
-        var date = entry.updated ? new Date(entry.updated) : new Date()
-        if (newer(date, tuple)) me.push(str)
-        putEntry(me.db, uri, entry, function (er) {
-          if (er) console.error(er)
-        })
-      })
-      .on('finish', function () {
-        cb()
-      }).resume()
-  })
+// Update all feeds (including entries) in store
+// - db The database instance
+function update (db) {
+  var reader = db.createValueStream({ start:FED })
+    , transf = new URLStream(db)
+    , writer = new FeedStream({ db:db, mode:1 })
+
+  reader
+    .pipe(transf)
+    .pipe(writer)
+
+  return writer
 }
 
-var mods = ['[', ','] // thought we'd need more
-EntryStream.prototype.prepend = function (str) {
-  var mod = mods[this.state]
-    , s = mod + str
-  if (this.state === 0) this.state = 1
-  return s
-}
 
-// Transform values of stored feeds to queries
-util.inherits(QueryStream, Transform)
-function QueryStream () {
-  if (!(this instanceof QueryStream)) return new QueryStream(db)
+// Transfrom stream values to tuples
+util.inherits(URLStream, Transform)
+function URLStream (db) {
+  if (!(this instanceof URLStream)) return new URLStream(db)
   Transform.call(this)
+  this._writableState.objectMode = false
+  this._readableState.objectMode = true
+  this._db = db
 }
 
-QueryStream.prototype._transform = function (chunk, enc, cb) {
-  this.push(chunk)
-}
-
-// A readable string stream
-// - str The string to stream/read
-util.inherits(ReadableString, Transform)
-function ReadableString (str) {
-  if (!(this instanceof ReadableString)) return new ReadableString(str)
-  Transform.call(this)
-  this.buf = new Buffer(str)
-}
-
-ReadableString.prototype._read = function (size) {
-  var ok = true
-    , chunk = null
-    , end = 0
-  do {
-    var buf = this.buf
-    if (buf === null || buf.length === 0) {
-      this.push(null)
-      break
-    }
-    end = size || buf.length
-    if (end > buf.length) end = buf.length
-    chunk = buf.slice(0, end)
-    ok = this.push(chunk)
-    this.buf = buf.slice(end, buf.length - end)
-  } while (ok && end > 0)
+URLStream.prototype._transform = function (chunk, enc, cb) {
+  var str = decode(chunk)
+  try {
+    var feed = JSON.parse(str)
+      , tuple = tupleFromUrl(feed.feed)
+    this.push(tuple)
+  } catch (er) {
+    console.error(er)
+  }
+  cb()
 }
 
 // miscellaneous functions
@@ -280,7 +296,7 @@ function keyFromTuple (tuple) {
 function putEntry (db, uri, entry, cb) {
   var date = new Date(entry.updated)
   var key = [
-  ENT
+    ENT
   , keyFromUri(uri)
   , keyFromDate(date)
   ].join(DIV)
@@ -300,39 +316,29 @@ function putFeed(db, uri, feed, cb) {
 }
 
 function getFeed (db, uri, cb) {
-  console.error('getFeed %s', uri)
   var key = [FED, keyFromUri(uri)].join(DIV)
   db.get(key, cb)
 }
 
-// Update whole store.
-// - db The database instance
-function update (db) {
-  var reader = new FeedStream({ db:db, mode:2 })
-    , transf = new QueryStream()
-    , writer = new EntryStream({ db:db, mode:1 })
-  reader.write('*')
-  return reader.pipe(transf)// TODO: Take care of things
+// Release streams
+// - streams Array of stream objects
+function release (streams) {
+  streams.forEach(function (stream) {
+    stream.unpipe()
+    stream.removeAllListeners()
+  })
 }
 
-function tuple (term) {
-  var url = term.url
-    , since = term.since || 0
-    , date = new Date(since)
-    , year = date.getUTCFullYear()
-    , month = date.getUTCMonth()
-    , day = date.getUTCDate()
-    , hours = date.getUTCHours()
-    , min = date.getUTCMinutes()
-    , sec = date.getUTCSeconds()
-  return [url, year, month, day, hours, min, sec]
-}
-
+// Decode utf8 binary to string
+// - buf utf8 encoded binary
 var decoder = new StringDecoder()
 function decode (buf) {
   return decoder.write(buf)
 }
 
+// true if value is stale and should be updated
+// - val The value to check
+// - mode The mode of the manger stream (1 | 2)
 function stale (val, mode) {
   var cached = !!val
     , fresh  = mode === 1
@@ -340,39 +346,8 @@ function stale (val, mode) {
   return (!cached || fresh) && !cache
 }
 
-// Parse JSON
-// - chunk The buffer or string to parse
-// - rest  The rest from the previous parse (optional)
-function parse (chunk, rest) {
-  var con = null
-  if (rest) {
-    var tl = rest.length + chunk.length
-    con = Buffer.concat([rest, chunk], tl)
-    rest = null
-  } else {
-    con = chunk
-  }
-  var start = 0
-    , end = 0
-    , res = null
-  while (end < con.length) {
-    var split = -1
-      , buf = con[end++]
-    if (buf === 125) split = end
-    if (split > -1) {
-      var str = decode(con.slice(start, end))
-        , term = null
-      try {
-        // assume we have a complete term
-        term = JSON.parse(str.substr(1, str.indexOf('}')))
-      } catch (er) {
-        console.error('Invalid JSON')
-        // TODO: What should we do?
-      }
-      start = end
-      res = tuple(term)
-    }
-    rest = con.slice(start, con.length)
-  }
-  return [chunk, rest]
+// Entry's date or now
+function date (entry) {
+  return entry.updated ? new Date(entry.updated) : new Date()
 }
+

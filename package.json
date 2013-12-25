@@ -1,6 +1,6 @@
 {
   "name": "manger",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "cache feeds",
   "main": "index.js",
   "directories": {
@@ -25,7 +25,9 @@
     "json",
     "feed",
     "aggregate",
-    "proxy"
+    "date",
+    "levelup",
+    "leveldb"
   ],
   "dependencies": {
     "pickup": "0.3.x"
@@ -35,7 +37,9 @@
     "st": "0.2.x",
     "tap": "0.4.x",
     "levelup": "0.18.x",
-    "leveldown": "0.10.x"
+    "leveldown": "0.10.x",
+    "buffer-equal": "0.0.x",
+    "stread": "0.0.x"
   },
   "engines": {
     "node": "0.11.x",

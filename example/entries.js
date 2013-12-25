@@ -2,36 +2,23 @@
 // entries - stream entries
 
 var entries = require('../').entries
+  , queries = require('../').queries
   , levelup = require('levelup')
+  , assert = require('assert')
+  , stread = require('stread')
 
-var writer = entries(opts())
-writer.pipe(process.stdout)
-go()
+start(function (er, db) {
+  assert(!er && db)
+  stread(json())
+    .pipe(queries())
+    .pipe(entries({ db:db }))
+    .pipe(process.stdout)
+})
 
-function go () {
-  var buf = new Buffer(json())
-    , len = buf.length
-    , start = 0
-    , end = 0
-    , chunk = null
-  write()
-  function write () {
-    var ok = true
-    do {
-      end = start + 8
-      if (end > len) end = len
-      chunk = buf.slice(start, end)
-      if (end === len) { // last time
-        writer.end(chunk)
-      } else {
-        ok = writer.write(chunk)
-        start += 8
-      }
-    } while (end < len && ok)
-    if (end < len) {
-      write.once('drain', write)
-    }
-  }
+function start (cb) {
+  levelup(loc(), null, function (er, db) {
+    cb(er, db)
+  })
 }
 
 function terms () {
@@ -41,6 +28,10 @@ function terms () {
   ]
 }
 
-function opts () { return { db:db() } }
-function json () { return JSON.stringify(terms()) }
-function db () { return levelup('/tmp/mangerdb') }
+function json () {
+  return JSON.stringify(terms())
+}
+
+function loc () {
+  return '/tmp/mangerdb'
+}

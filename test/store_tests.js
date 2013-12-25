@@ -20,7 +20,7 @@ test('setup', function (t) {
   fs.mkdirSync(dir, 0700)
   t.ok(fs.statSync(dir).isDirectory(), 'should exist')
 
-  http.get(uri('nyt.xml'), function (res) {
+  http.get(uri('b2w.xml'), function (res) {
     t.ok(res)
   }).on('error', function (er) {
     t.fail('server unavailable')

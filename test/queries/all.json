@@ -1,0 +1,7 @@
+[
+  {"url": "localhost:1337/b2w.xml"}
+, {"url": "localhost:1337/ddc.xml"}
+   ,    {"url": "localhost:1337/rl.xml"}
+, {"url": "localhost:1337/rz.xml"}
+, {"url": "localhost:1337/tal.xml"}
+]
