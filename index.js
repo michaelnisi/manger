@@ -31,6 +31,7 @@ var createHash = require('crypto').createHash
   , url = require('url')
   , parse = require('./lib/queries').parse
   , tuple = require('./lib/queries').tuple
+  , etag = require('./lib/requests').etag
 
 var ENT = 'ent' // ent\x00hash(feed_url)\x00YYYY\x00MM\x00DD
   , FED = 'fed' // fed\x00hash(feed_url)
@@ -92,16 +93,18 @@ ATransform.prototype.destroy = function() {
 }
 
 // Request via HTTP or retrieve from store
+// taking to account in-flights and etags
 ATransform.prototype._transform = function (tuple, enc, cb) {
   var me = this
   if (tuple) {
     var uri = tuple[0]
     getFeed(me.db, uri, function (er, val) {
+      // TODO: That interesting! Really?
       if (stale(val, me.mode)) {
-        var stream
-        if (!!(stream = inFlight(me.uid(tuple[0])))) {
-          stream.on('end', function () {
-            me.retrieve(tuple, cb)
+        if (val) {
+          var feed = JSON.parse(val)
+          changed(feed, uri, function (yes) {
+            yes ? me.request(tuple, cb) : me.retrieve(tuple, cb)
           })
         } else {
           me.request(tuple, cb)
@@ -119,9 +122,23 @@ ATransform.prototype.uid = function (uri) {
   return [this.db.location, uri].join('~')
 }
 
+ATransform.prototype.shiftable = function (tuple, cb) {
+  var stream
+    , me = this
+
+  if (!!(stream = inFlight(me.uid(tuple[0])))) {
+    stream.on('end', function () {
+      me.retrieve(tuple, cb)
+    })
+  }
+  return !!stream
+}
+
 ATransform.prototype.request = function (tuple, cb) {
   var uri = tuple[0]
     , me = this
+
+  if (me.shiftable(tuple, cb)) return
 
   http.get(['http://', uri].join(''), function (res) {
     res.pipe(pickup())
@@ -373,6 +390,12 @@ function stale (val, mode) {
     , fresh  = mode === 1
     , cache  = mode === 2
   return (!cached || fresh) && !cache
+}
+
+function changed (feed, uri, cb) {
+  etag(['http://', uri].join(''), function (et) {
+    cb(feed.etag !== et)
+  })
 }
 
 // Entry's date or now
