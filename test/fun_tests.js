@@ -46,13 +46,40 @@ test('key from Date', function (t) {
 
 test('is requested', function (t) {
   var fun = manger.newer
-  t.ok(fun(new Date(2012, 8, 8), ['url', 2011, 10, 10]), 'should be newer')
-  t.ok(!fun(new Date(2012, 8, 8), ['url', 2013, 10, 10], 'should be older'))
-  t.ok(fun(new Date(2013, 11, 11), ['url', 2013, 10, 10]), 'should be newer')
-  t.ok(fun(new Date(2013, 10, 11), ['url', 2013, 10, 10]), 'should be newer')
-  t.ok(!fun(new Date(2013, 9, 9), ['url', 2013, 10, 10]), 'should be older')
-  t.ok(fun(new Date('Wed, 06 Mar 2013 01:00:00 +0100'), ['url', 2013]), 'should be newer')
-  t.ok(fun(new Date(), ['url', 2013]), 'should be newer')
+  t.ok(
+    fun(new Date(2012, 8, 8)
+  , ['url', 2011, 10, 10])
+  , 'should be newer'
+  )
+  t.ok(
+    !fun(new Date(2012, 8, 8)
+  , ['url', 2013, 10, 10])
+  , 'should be older'
+  )
+  t.ok(
+    fun(new Date(2013, 11, 11)
+  , ['url', 2013, 10, 10])
+  , 'should be newer'
+  )
+  t.ok(
+    fun(new Date(2013, 10, 11)
+  , ['url', 2013, 10, 10])
+  , 'should be newer'
+  )
+  t.ok(
+    !fun(new Date(2013, 9, 9)
+  , ['url', 2013, 10, 10])
+  , 'should be older')
+  t.ok(
+    fun(new Date('Wed, 06 Mar 2013 01:00:00 +0100')
+  , ['url', 2013])
+  , 'should be newer'
+  )
+  t.ok(
+    fun(new Date()
+  , ['url', 2013])
+  , 'should be newer'
+  )
   t.end()
 })
 

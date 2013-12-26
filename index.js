@@ -40,15 +40,16 @@ var ENT = 'ent' // ent\x00hash(feed_url)\x00YYYY\x00MM\x00DD
 
 var debug
 if (process.env.NODE_DEBUG || process.env.NODE_TEST) {
-  debug = function(x) { console.error('* manger: %s', x) }
+  debug = function (o) { console.error('**manger: %s', o) }
 } else {
-  debug = function() { }
+  debug = function () { }
 }
 
 // Abstract base class for transform streams
 // - opts
 //   - db The database instance
 //   - mode 1 | 2 (FRESH | CACHE) Defaults to 1 | 2
+//   - log A bunyan log instance (https://github.com/trentm/node-bunyan)
 var UPDATE_MODES = {
   FRESH: 1
 , CACHE: 2
@@ -59,11 +60,13 @@ function ATransform(opts) {
   if (!(this instanceof ATransform)) return new ATransform(opts)
   Transform.call(this)
   this._writableState.objectMode = true
-  this._readableState.objectMode = false // TODO: false?
+  this._readableState.objectMode = false
   this._pushFeeds = false
   this._pushEntries = true
+
   this.db = opts.db
   this.mode = opts.mode || 1 | 2 // FRESH | CACHE
+  this.log = opts.log
   this.state = 0
 }
 
@@ -95,7 +98,14 @@ ATransform.prototype._transform = function (tuple, enc, cb) {
     var uri = tuple[0]
     getFeed(me.db, uri, function (er, val) {
       if (stale(val, me.mode)) {
-        me.request(tuple, cb)
+        var stream
+        if (!!(stream = inFlight(me.uid(tuple[0])))) {
+          stream.on('end', function () {
+            me.retrieve(tuple, cb)
+          })
+        } else {
+          me.request(tuple, cb)
+        }
       } else {
         me.retrieve(tuple, cb)
       }
@@ -105,45 +115,62 @@ ATransform.prototype._transform = function (tuple, enc, cb) {
   }
 }
 
+ATransform.prototype.uid = function (uri) {
+  return [this.db.location, uri].join('~')
+}
+
 ATransform.prototype.request = function (tuple, cb) {
   var uri = tuple[0]
     , me = this
+
   http.get(['http://', uri].join(''), function (res) {
     res.pipe(pickup())
       .on('error', function (er) {
-        console.error(er)
+        me.error('Parser error')
+        land(me.uid(uri))
         cb()
       })
       .on('feed', function (feed) {
         feed.feed = uri // TODO: Better name
+        // TODO: Store etag to compare later
         var str = me.prepend(JSON.stringify(feed))
         if (me._pushFeeds) me.push(str)
         putFeed(me.db, uri, feed, function (er) {
-          if (er) console.error(er)
+          if (er) me.error(er)
         })
       })
       .on('entry', function (entry) {
         entry.feed = uri // just so we know
         var str = me.prepend(JSON.stringify(entry))
-        var date = entry.updated ? new Date(entry.updated) : new Date()
-        if (me._pushEntries && newer(date, tuple)) me.push(str)
+        if (me._pushEntries && newer(date(entry), tuple)) me.push(str)
         putEntry(me.db, uri, entry, function (er) {
-          if (er) console.error(er)
+          if (er) me.error(er)
         })
       })
       .on('finish', function () {
+        land(me.uid(uri))
         cb()
       }).resume()
+
+    fly(me.uid(uri), res)
   })
 }
 
-ATransform.prototype.toString = function() {
+ATransform.prototype.toString = function () {
   return ['Manger ', this.constructor.name].join()
+}
+
+ATransform.prototype.error = function (x) {
+  if (this.log) this.log.error(x)
+}
+
+ATransform.prototype.info = function (x) {
+  if (this.log) this.log.info(x)
 }
 
 // Stream feeds
 util.inherits(FeedStream, ATransform)
-function FeedStream(opts) {
+function FeedStream (opts) {
   if (!(this instanceof FeedStream)) return new FeedStream(opts)
   ATransform.call(this, opts)
   this._pushFeeds = true
@@ -155,7 +182,9 @@ FeedStream.prototype.retrieve = function (tuple, cb) {
     , key = [FED, keyFromTuple(tuple)].join(DIV)
 
   me.db.get(key, function (er, val) {
-    if (!er && val) {
+    if (er) {
+      me.error(er)
+    } else if (val) {
       var str = me.prepend(val)
       me.push(str)
     }
@@ -179,7 +208,8 @@ EntryStream.prototype.retrieve = function (tuple, cb) {
     var str = me.prepend(value)
     me.push(str)
   })
-  stream.on('end', function (er) {
+  stream.on('error', me.error)
+  stream.on('end', function () {
     cb()
   })
 }
@@ -198,7 +228,6 @@ function update (db) {
   return writer
 }
 
-
 // Transfrom stream values to tuples
 util.inherits(URLStream, Transform)
 function URLStream (db) {
@@ -216,7 +245,7 @@ URLStream.prototype._transform = function (chunk, enc, cb) {
       , tuple = tupleFromUrl(feed.feed)
     this.push(tuple)
   } catch (er) {
-    console.error(er)
+    this.error(er)
   }
   cb()
 }
@@ -351,3 +380,21 @@ function date (entry) {
   return entry.updated ? new Date(entry.updated) : new Date()
 }
 
+// Dictionary of request streams currently in-flight
+var _flights
+function flights () {
+  if (!_flights) _flights = Object.create(null)
+  return _flights
+}
+
+function inFlight (uid) {
+  return flights()[uid]
+}
+
+function fly (uid, stream) {
+  flights()[uid] = stream
+}
+
+function land (uid) {
+  flights()[uid] = null
+}
