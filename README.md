@@ -1,12 +1,12 @@
 # manger - cache feeds 
 
-The manger [Node.js](http://nodejs.org/) module caches RSS and Atom formatted XML feeds using [LevelDB](https://github.com/rvagg/node-levelup).
+The manger [Node.js](http://nodejs.org/) module caches RSS and Atom formatted XML feeds using [LevelDB](https://github.com/rvagg/node-levelup). But not only does it cache, it supports aggregated requests with individual time intervals (from now). I wrote it for a mobile client which needs to get all updated entries of multiple feeds and time spans with a single request.
 
 [![Build Status](https://secure.travis-ci.org/michaelnisi/manger.png)](http://travis-ci.org/michaelnisi/manger) [![David DM](https://david-dm.org/michaelnisi/manger.png)](http://david-dm.org/michaelnisi/manger)
 
 ## Usage
 
-### Stream [entries](https://github.com/michaelnisi/pickup#evententry) as JSON string (as an array)
+### Stream [entries](https://github.com/michaelnisi/pickup#evententry)
 
 ```js
 var entries = require('manger').entries
@@ -45,10 +45,11 @@ function loc () {
 }
 ```
 
-To try this from the command-line:
+To try this example on the command-line, you might want to pipe it to [json](https://github.com/trentm/json) like so:
 ```
 node example/entries.js | json
 ```
+Running this again, you should see cached data.
 
 ## API
 
@@ -61,6 +62,8 @@ node example/entries.js | json
 - `db` A levelup database instance
 
 ### queries()
+
+Returns a Transform stream that transform JSON buffers to tuples which can be written to `entries(opts)` and `feeds(opts)`.
 
 ### opts()
 

@@ -6,11 +6,13 @@ var test = require('tap').test
   , stread = require('stread')
 
 test('setup', function (t) {
-  t.ok(process.env.NODE_TEST, 'should be test test environment')
+  t.plan(1)
+  t.ok(process.env.NODE_TEST, 'should be test environment')
   t.end()
 })
 
 test('flowing mode', function (t) {
+  t.plan(1)
   var actual = []
   fs.createReadStream('./queries/all.json')
     .pipe(queries.queries())
@@ -27,6 +29,8 @@ test('flowing mode', function (t) {
 })
 
 test('non-flowing mode', function (t) {
+  t.plan(1)
+
   var data = fs.readFileSync('./queries/all.json')
     , reader = stread(data)
     , writer = queries.queries()
@@ -59,11 +63,12 @@ test('non-flowing mode', function (t) {
 })
 
 test('tuple', function (t) {
+  t.plan(3)
   var f = queries.tuple
   var expected = [
-    ['http://5by5.tv/rss', 1970, 0,  1, 0,  0,  0]
-  , ['http://5by5.tv/rss', 1970, 0,  1, 0,  0,  0]
-  , ['http://5by5.tv/rss', 1970, 0, 17, 1, 18, 26]
+    ['http://5by5.tv/rss', 0]
+  , ['http://5by5.tv/rss', 0]
+  , ['http://5by5.tv/rss', 1387106898]
   ]
   ;[
     {url:'http://5by5.tv/rss'}
@@ -77,10 +82,10 @@ test('tuple', function (t) {
 
 function all() {
   return [
-    ['localhost:1337/b2w.xml', 1970, 0, 1, 0, 0, 0]
-  , ['localhost:1337/ddc.xml', 1970, 0, 1, 0, 0, 0]
-  , ['localhost:1337/rl.xml', 1970, 0, 1, 0, 0, 0]
-  , ['localhost:1337/rz.xml', 1970, 0, 1, 0, 0, 0]
-  , ['localhost:1337/tal.xml', 1970, 0, 1, 0, 0, 0]
+    ['http://localhost:1337/b2w.xml', 0]
+  , ['http://localhost:1337/ddc.xml', 0]
+  , ['http://localhost:1337/rl.xml', 0]
+  , ['http://localhost:1337/rz.xml', 0]
+  , ['http://localhost:1337/tal.xml', 0]
   ]
 }

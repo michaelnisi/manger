@@ -23,8 +23,14 @@ function start (cb) {
 
 function terms () {
   return [
-    { url:"feeds.muleradio.net/thetalkshow", since:Date.UTC(2013, 11)}
-  , { url:"5by5.tv/rss", since:Date.UTC(2013, 11) }
+    {
+      url:"http://feeds.muleradio.net/thetalkshow"
+    , since:Date.UTC(2013, 11)
+    }
+  , {
+      url:"http://5by5.tv/rss"
+    , since:Date.UTC(2013, 11)
+    }
   ]
 }
 
