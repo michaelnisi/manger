@@ -137,14 +137,15 @@ ATransform.prototype.request = function (tuple, cb) {
 }
 
 function decorate (res, tuple, cb) {
-  res.uri = uri(tuple)
+  res.tuple = tuple
   res.cb = cb
   return res
 }
 
 ATransform.prototype.respond = function (res) {
   var me = this
-    , uri = res.uri
+    , tuple = res.tuple
+    , uri = res.tuple[0]
     , cb = res.cb
 
   res
