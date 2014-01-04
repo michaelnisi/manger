@@ -230,8 +230,8 @@ function EntryStream (opts) {
 
 EntryStream.prototype.retrieve = function (tuple, cb) {
   var me = this
-    , start = keys.key(ENT, tuple)
-    , end = keys.key(ENT, [tuple[0], Date.now()])
+    , start = keys.key(keys.ENT, tuple)
+    , end = keys.key(keys.ENT, [tuple[0], Date.now()])
     , stream = me.db.createValueStream({start:start, end:end})
 
   stream.on('data', function (value) {

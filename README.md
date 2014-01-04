@@ -6,69 +6,32 @@ The manger [Node.js](http://nodejs.org/) module caches RSS and Atom formatted XM
 
 ## Usage
 
-### Stream [entries](https://github.com/michaelnisi/pickup#evententry)
-
 ```js
-var entries = require('manger').entries
-  , queries = require('manger').queries
+var manger = require('manger')
   , levelup = require('levelup')
   , assert = require('assert')
-  , stread = require('stread')
 
 start(function (er, db) {
   assert(!er && db)
-  stread(json())
-    .pipe(queries())
-    .pipe(entries({ db:db }))
+  process.stdin
+    .pipe(manger.queries())
+    .pipe(manger.entries({ db:db }))
     .pipe(process.stdout)
 })
 
 function start (cb) {
-  levelup(loc(), null, function (er, db) {
+  levelup('/tmp/mangerdb', null, function (er, db) {
     cb(er, db)
   })
-}
-
-function terms () {
-  return [
-    { url:"feeds.muleradio.net/thetalkshow", since:Date.UTC(2013, 11)}
-  , { url:"5by5.tv/rss", since:Date.UTC(2013, 11) }
-  ]
-}
-
-function json () {
-  return JSON.stringify(terms())
-}
-
-function loc () {
-  return '/tmp/mangerdb'
 }
 ```
 
 To try this example on the command-line, you might want to pipe it to [json](https://github.com/trentm/json) like so:
 ```
-node example/entries.js | json
+cat example/5by5.json | node example/stdin.js | json
 ```
+
 Running this again, you should see cached data.
-
-## API
-
-### entries(opts())
-
-### feeds(opts())
-
-### update(db)
-
-- `db` A levelup database instance
-
-### queries()
-
-Returns a Transform stream that transform JSON buffers to tuples which can be written to `entries(opts)` and `feeds(opts)`.
-
-### opts()
-
-- `db` A levelup database instance
-- `mode` Possible modes are 1, 2, and 3 (default)
 
 ## Installation
 
