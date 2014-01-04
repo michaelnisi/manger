@@ -26,12 +26,16 @@ function start (cb) {
 }
 ```
 
-To try this example on the command-line, you might want to pipe it to [json](https://github.com/trentm/json) like so:
+To try above example on the command-line, you might pipe to [json](https://github.com/trentm/json) like so:
 ```
 cat example/5by5.json | node example/stdin.js | json
 ```
 
 Running this again, you should see cached data.
+
+## Note
+
+I'm in the process of writing this; once I'm satisfied with the API, I'll write a proper README. It's probably a good idea not to rely on this code just yet.
 
 ## Installation
 
