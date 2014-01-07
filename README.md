@@ -15,7 +15,7 @@ start(function (er, db) {
   assert(!er && db)
   process.stdin
     .pipe(manger.queries())
-    .pipe(manger.entries({ db:db }))
+    .pipe(manger.entries(manger.opts(db))
     .pipe(process.stdout)
 })
 
@@ -26,7 +26,7 @@ function start (cb) {
 }
 ```
 
-To try above example on the command-line, you might pipe to [json](https://github.com/trentm/json) like so:
+To try above on the command-line, pipe to [json](https://github.com/trentm/json) like so:
 ```
 cat example/5by5.json | node example/stdin.js | json
 ```

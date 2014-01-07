@@ -1,6 +1,7 @@
 
 // manger - cache feeds
 
+module.exports.opts = Opts
 module.exports.feeds = FeedStream
 module.exports.entries = EntryStream
 module.exports.update = update
@@ -15,17 +16,18 @@ if (process.env.NODE_TEST) {
   module.exports.getEntry = getEntry
   module.exports.stale = stale
   module.exports.newer = newer
+  module.exports.flights = flights
 }
 
 var pickup = require('pickup')
   , http = require('http')
+  , assert = require('assert')
   , stream = require('stream')
   , util = require('util')
   , url = require('url')
   , string_decoder = require('string_decoder')
   , keys = require('./lib/keys')
   , requests = require('./lib/requests')
-  , assert = require('assert')
 
 var debug
 if (process.env.NODE_DEBUG || process.env.NODE_TEST) {
@@ -43,20 +45,19 @@ function mode (k) {
   }[k]
 }
 
-// @doc
+// Options
 // - db levelup()
 // - mode mode()
 // - log bunyan()
-function opts (db, mode, log) {
-  return {
-    db: db
-  , mode: mode
-  , log: log
-  }
+function Opts (db, mode, log) {
+  if (!(this instanceof Opts)) return new Opts(db, mode, log)
+  this.db = db
+  this.mode = mode
+  this.log = log
 }
 
 // Abstract base class for manger transforms
-// - opts()
+// - Opts()
 util.inherits(ATransform, stream.Transform)
 function ATransform (opts) {
   if (!(this instanceof ATransform)) return new ATransform(opts)
@@ -91,10 +92,14 @@ ATransform.prototype.destroy = function () {
   release([this])
 }
 
+// - tuple tuple()
 function uri (tuple) {
   return tuple[0]
 }
 
+// @doc
+// - uri Uniform resource identifier
+// - time Coordinated Universal Time (optional)
 function tuple (uri, time) {
   return [uri, time || Date.UTC(1970, 0)]
 }
@@ -104,10 +109,17 @@ function tuple (uri, time) {
 ATransform.prototype._transform = function (tuple, enc, cb) {
   var me = this
   getETag(me.db, uri(tuple), function (er, etag) {
-    if (!er && etag) {
+    var mode = me.mode
+    if (mode === 2 || mode !== 1 && !er && etag) {
       me.retrieve(tuple, cb)
     } else {
-      me.request(tuple, cb)
+      requests.changed(etag, uri(tuple), function (er, yes) {
+        if (yes) {
+          me.request(tuple, cb)
+        } else {
+          me.retrieve(tuple, cb)
+        }
+      })
     }
   })
 }
@@ -147,40 +159,51 @@ ATransform.prototype.respond = function (res) {
     , tuple = res.tuple
     , uri = res.tuple[0]
     , cb = res.cb
+    , parser = pickup()
 
-  res
-    .pipe(pickup())
-    .on('error', function (er) {
-      me.error('Parser error')
+  function onError (er) {
+    me.error(er)
+  }
+
+  function onFeed (feed) {
+    feed.feed = uri // TODO: Better name
+    if (me.pushFeeds) {
+      me.push(me.prepend(JSON.stringify(feed)))
+    }
+    putFeed(me.db, uri, feed, function (er) {
+      if (er) me.error(er)
+    })
+  }
+
+  function onEntry (entry) {
+    entry.feed = uri // just so we know
+    if (me.pushEntries && newer(date(entry), tuple)) {
+      me.push(me.prepend(JSON.stringify(entry)))
+    }
+    putEntry(me.db, uri, entry, function (er) {
+      if (er) me.error(er)
+    })
+  }
+
+  function onFinish () {
+    parser.removeListener('error', onError)
+    parser.removeListener('feed', onFeed)
+    parser.removeListener('entry', onEntry)
+    parser.removeListener('finish', onFinish)
+    putETag(me.db, uri, etag(res), function (er) {
+      if (er) me.error(er)
       land(me.uid(uri))
-      cb()
+      cb(er)
     })
-    .on('feed', function (feed) {
-      feed.feed = uri // TODO: Better name
-      if (me.pushFeeds) {
-        me.push(me.prepend(JSON.stringify(feed)))
-      }
-      putFeed(me.db, uri, feed, function (er) {
-        if (er) me.error(er)
-      })
-    })
-    .on('entry', function (entry) {
-      entry.feed = uri // just so we know
-      if (me.pushEntries && newer(date(entry), tuple)) {
-        me.push(me.prepend(JSON.stringify(entry)))
-      }
-      putEntry(me.db, uri, entry, function (er) {
-        if (er) me.error(er)
-      })
-    })
-    .on('finish', function () {
-      putETag(me.db, uri, etag(res), function (er) {
-        if (er) me.error(er)
-        land(me.uid(uri))
-        cb()
-      })
-    }).resume()
-  fly(me.uid(uri), res)
+  }
+
+  parser.on('error', onError)
+  parser.on('feed', onFeed)
+  parser.on('entry', onEntry)
+  parser.on('finish', onFinish)
+
+  fly(me.uid(uri), parser) // TODO: Wonky!
+  res.pipe(parser).resume()
 }
 
 function etag(res) {
@@ -192,12 +215,13 @@ ATransform.prototype.toString = function () {
 }
 
 ATransform.prototype.error = function (x) {
-  debug(x)
   if (this.log) this.log.error(x)
+  debug(x)
 }
 
 ATransform.prototype.info = function (x) {
   if (this.log) this.log.info(x)
+  debug(x)
 }
 
 // Stream feeds
@@ -299,6 +323,7 @@ function flights () {
   return _flights
 }
 
+// - uid ATransform.prototype.uid()
 function inFlight (uid) {
   return flights()[uid]
 }

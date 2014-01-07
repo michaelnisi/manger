@@ -7,7 +7,7 @@ start(function (er, db) {
   assert(!er && db)
   process.stdin
     .pipe(manger.queries())
-    .pipe(manger.entries({ db:db }))
+    .pipe(manger.entries(manger.opts(db)))
     .pipe(process.stdout)
 })
 
