@@ -1,33 +1,67 @@
 # manger - cache feeds 
 
-The manger [Node.js](http://nodejs.org/) module caches RSS and Atom formatted XML feeds using [LevelDB](https://github.com/rvagg/node-levelup). But not only does it cache, it supports aggregated requests with individual time intervals (from now). I wrote it for a mobile client which needs to get all updated entries of multiple feeds and time spans with a single request.
+The manger [Node.js](http://nodejs.org/) module caches RSS and Atom formatted XML feeds using [LevelUP](https://github.com/rvagg/node-levelup). But not only does it cache, it supports aggregated requests with individual time intervals (from now). I wrote it for a mobile client which needs to get all updated entries of multiple feeds and time spans with a single request.
 
 [![Build Status](https://secure.travis-ci.org/michaelnisi/manger.png)](http://travis-ci.org/michaelnisi/manger) [![David DM](https://david-dm.org/michaelnisi/manger.png)](http://david-dm.org/michaelnisi/manger)
 
 ## Usage
 
-```js
-var manger = require('manger')
-  , levelup = require('levelup')
-  , assert = require('assert')
+### Pipe stdin
 
-start(function (er, db) {
-  assert(!er && db)
+```js
+var manger = require('../')
+  , levelup = require('levelup')
+
+levelup(loc(), null, function (er, db) {
   process.stdin
     .pipe(manger.queries())
     .pipe(manger.entries(manger.opts(db)))
     .pipe(process.stdout)
 })
 
-function start (cb) {
-  levelup('/tmp/mangerdb', null, function (er, db) {
-    cb(er, db)
-  })
+function loc () {
+  return '/tmp/mangerdb'
 }
 ```
 To try above on the command-line, pipe to [json](https://github.com/trentm/json) like so:
 ```
 cat example/5by5.json | node example/stdin.js | json
+```
+
+### Manual queries
+```js
+var manger = require('manger')
+  , levelup = require('levelup')
+
+levelup(loc(), null, function (er, db) {
+  var opts = manger.opts(db)
+    , writer = manger.feeds(opts) // manger.entries(opts)
+    , queries = queries()
+    , i = queries.length
+
+  writer.pipe(process.stdout)
+
+  ;(function write () {
+    var ok = true
+    do { ok = writer.write(queries[--i]) } while (i > 0)
+  })()
+  i > 0 ? writer.once('drain', write) : writer.end()
+
+  function queries () {
+    return [
+      ['http://feeds.muleradio.net/thetalkshow']
+    , ['http://feeds.muleradio.net/mistakes']
+    ]
+  }
+})
+
+function loc () {
+  return '/tmp/mangerdb'
+}
+```
+To see this, try:
+```
+node example/feeds.js | json -a title
 ```
 
 ## API

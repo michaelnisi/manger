@@ -1,6 +1,6 @@
 {
   "name": "manger",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "cache feeds",
   "main": "index.js",
   "directories": {
@@ -38,7 +38,6 @@
     "tap": "0.4.x",
     "levelup": "0.18.x",
     "leveldown": "0.10.x",
-    "buffer-equal": "0.0.x",
     "stread": "0.0.x"
   },
   "engines": {
