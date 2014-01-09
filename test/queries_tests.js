@@ -1,6 +1,5 @@
 
 var test = require('tap').test
-  , bufferEqual = require('buffer-equal')
   , fs = require('fs')
   , queries = require('../lib/queries')
   , stread = require('stread')
@@ -30,7 +29,6 @@ test('flowing mode', function (t) {
 
 test('non-flowing mode', function (t) {
   t.plan(1)
-
   var data = fs.readFileSync('./queries/all.json')
     , reader = stread(data)
     , writer = queries.queries()
@@ -46,7 +44,7 @@ test('non-flowing mode', function (t) {
     })
 
   function size () {
-    // TODO: Why does read(0) crash?
+    // TODO: Why does reader.read(0) crash?
     return Math.round(Math.random() * 16) + 1
   }
   ;(function write () {

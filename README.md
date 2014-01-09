@@ -15,7 +15,7 @@ start(function (er, db) {
   assert(!er && db)
   process.stdin
     .pipe(manger.queries())
-    .pipe(manger.entries(manger.opts(db))
+    .pipe(manger.entries(manger.opts(db)))
     .pipe(process.stdout)
 })
 
@@ -25,17 +25,87 @@ function start (cb) {
   })
 }
 ```
-
 To try above on the command-line, pipe to [json](https://github.com/trentm/json) like so:
 ```
 cat example/5by5.json | node example/stdin.js | json
 ```
 
-Running this again, you should see cached data.
+## API
 
-## Note
+The manger module leverages the lexicographical key sort order of Leveldb to implement a cache for RSS and Atom formatted XML feeds. The keys are optimized to stream feeds or entries in time ranges between now and some point in the past. The API speaks JSON.
 
-I'm in the process of writing this; once I'm satisfied with the API, I'll write a proper README. It's probably a good idea not to rely on this code just yet.
+The distinction between feed and entries may seem dubious. A feed is the meta information of an RSS or Atom feed (title, author, published, etc.), while entries are the actual items in the feed. These are separated in manger to not repeatedly transmit feed information. Essentially this package tries to limit number of requests and data transfers.
+
+In the default mode(`3`) all data is retrieved from the cache, if a requested feed isn't cached yet, it is requested and stored in the cache before it is returned. To keep the cache up to date the update function has to be applied regularly. This is an expensive operation which will harm performance if done too frequently.
+
+It is possible to run manger functions in workers of a cluster: of course you have to provide each worker its own database, as LevelUP is an in-process database. The databases are not synced.
+
+You can load manger functions by doing `require('manger')`.
+
+### opts(db, mode, log)
+- `db` [levelup()](https://github.com/rvagg/node-levelup)
+- `mode` mode() `1 | 2`
+- `log` [bunyan()](https://github.com/trentm/node-bunyan)
+
+Bag of options, where only `db` is required. Remember that a database cannot be opened by parallel Node processes.
+
+- mode() Set mode to `1`, if cache should be forcefully refreshed, set to `2` to retrieve cached data only. In the default mode(`3`) manger uses `HEAD` requests comparing ETags to decide which feeds need to be updated. Usually users don't have to set mode.
+
+### entries(opts())
+
+The entries duplex stream is a stream of entries, defined in the [pickup](https://github.com/michaelnisi/pickup) module which manger uses to transform XML feeds. 
+
+- [entry()](https://github.com/michaelnisi/pickup#evententry)
+- tuple() [String(), Date.UTC()]
+
+Write tuples to it:
+
+- tuple()
+
+And read a JSON string from it:
+```js
+'[entry(), ...]'
+```
+
+### feeds(opts())
+
+The feeds duplex stream is a stream of feeds, like entries, also defined in the pickup module.
+
+- [feed()](https://github.com/michaelnisi/pickup#eventfeed)
+
+Write tuples to it:
+
+- tuple()
+
+And read a JSON string from it:
+```js
+'[feed(), ...]'
+```
+
+### update(opts())
+
+The update function updates the whole cache, it return a readable stream of the updated feed() objects.
+
+### queries()
+
+A convenience duplex stream to transform JSON strings to manger tuples. Write JSON strings or buffers with content of following format:
+```js
+[{"url":String(), "since":Date.UTC()}, ...]
+```
+and read tuple(). 
+
+The stream applies 'data' listeners with one tuple() per event. 
+```js
+queries().on('data', function (tuple) { ... })
+```
+
+This lets you conveniently pipe (or write) request bodies to manger:
+
+```js
+http.request()
+  .pipe(manger.queries())
+  .pipe(manger.entries(manger.opts())
+```
 
 ## Installation
 

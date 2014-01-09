@@ -88,7 +88,7 @@ ATransform.prototype.prepend = function (str) {
 
 ATransform.prototype.destroy = function () {
   this.db = null
-  this.rest = null
+  this.log = null
   release([this])
 }
 
@@ -131,21 +131,26 @@ ATransform.prototype.uid = function (uri) {
 ATransform.prototype.defer = function (tuple, cb) {
   var stream, me = this
   if (!!(stream = inFlight(me.uid(tuple[0])))) {
-    stream.on('end', function () {
+    function later () {
+      stream.removeListener('end', later)
       me.retrieve(tuple, cb)
-    })
+    }
+    stream.on('end', later)
   }
   return !!stream
 }
 
 ATransform.prototype.request = function (tuple, cb) {
   var me = this
-  http.get(uri(tuple), function (res) {
+  var req = http.get(uri(tuple), function (res) {
     me.respond(decorate(res, tuple, cb))
-  }).on('error', function (er) {
-    me.error(er)
-    cb()
   })
+  function error (er) {
+    req.removeListener('error', error)
+    me.error(er)
+    cb() // TODO: Not so sure
+  }
+  req.on('error', error)
 }
 
 function decorate (res, tuple, cb) {
@@ -186,6 +191,7 @@ ATransform.prototype.respond = function (res) {
   }
 
   function onFinish () {
+    res.unpipe()
     parser.removeListener('error', onError)
     parser.removeListener('feed', onFeed)
     parser.removeListener('entry', onEntry)
@@ -259,14 +265,21 @@ EntryStream.prototype.retrieve = function (tuple, cb) {
     , end = keys.key(keys.ENT, [tuple[0], Date.now()])
     , stream = me.db.createValueStream({start:start, end:end})
 
-  stream.on('data', function (value) {
+  function push (value) {
     var str = me.prepend(value)
     me.push(str)
-  })
-  stream.on('error', me.error)
-  stream.on('end', function () {
+  }
+
+  function done () {
+    stream.removeListener('data', push)
+    stream.removeListener('error', me.error)
+    stream.removeListener('end', done)
     cb()
-  })
+  }
+
+  stream.on('data', push)
+  stream.on('error', me.error)
+  stream.on('end', done)
 }
 
 // Transfrom stream values to tuples
@@ -308,12 +321,28 @@ function update (opts) {
     , urls = new URLStream(opts)
     , writer = new FeedStream(opts)
 
-  // TODO: Aren't there any errors to handle here?
-  reader
-    .pipe(urls)
-    .pipe(writer)
+  function onReaderEnd () {
+    reader.removeListener('error', me.error)
+    reader.removeListener('end', onReaderEnd)
+  }
+  function onUrlsFinish() {
+    reader.unpipe()
+    urls.removeListener('error', me.error)
+    urls.removeListener('finish', onUrlsFinish)
+  }
+  function onWriterFinish () {
+    urls.unpipe()
+    writer.removeListener('error', me.error)
+    writer.removeListener('finish', onWriterFinish)
+  }
+  reader.on('error', me.error)
+  reader.on('end', onReaderEnd)
+  urls.on('error', me.error)
+  urls.on('finish', onUrlsFinish)
+  writer.on('error', me.error)
+  writer.on('finish', onWriterFinish)
 
-  return writer
+  return reader.pipe(urls).pipe(writer)
 }
 
 // Dictionary of request streams currently in-flight
