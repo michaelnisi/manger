@@ -87,7 +87,7 @@ Bag of options, where only `db` is required. Remember that a database cannot be 
 
 ### entries(opts())
 
-The entries duplex stream is a stream of entries, defined in the [pickup](https://github.com/michaelnisi/pickup) module which manger uses to transform XML feeds. 
+The entries duplex stream is a stream of entries which are defined by [pickup](https://github.com/michaelnisi/pickup) (a streaming parser).
 
 - [entry()](https://github.com/michaelnisi/pickup#evententry)
 - tuple() [String(), Date.UTC()]
@@ -103,7 +103,7 @@ And read a JSON string from it:
 
 ### feeds(opts())
 
-The feeds duplex stream is a stream of feeds, like entries, also defined in the pickup module.
+The feeds duplex stream is a stream of feeds, like entries, these are also products of the pickup package.
 
 - [feed()](https://github.com/michaelnisi/pickup#eventfeed)
 
@@ -118,7 +118,7 @@ And read a JSON string from it:
 
 ### update(opts())
 
-The update function updates the whole cache, it return a readable stream of the updated feed() objects.
+The update function updates the whole cache, it returns a readable stream of the updated feed() objects. Manger performs `HEAD` requests with all feed URLs in the store, and after comparing the server side ETags with the stored ETags, updates the entries for all feeds. Previous values with the identical keys are overwritten. The keys are generated from the URLs of the feeds and the entries respectivly. Nothing gets deleted or synced.  
 
 ### queries()
 
