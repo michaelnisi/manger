@@ -148,7 +148,7 @@ ATransform.prototype.request = function (tuple, cb) {
   function error (er) {
     req.removeListener('error', error)
     me.error(er)
-    cb() // TODO: Not so sure
+    cb() // TODO: Review
   }
   req.on('error', error)
 }
@@ -241,7 +241,10 @@ function FeedStream (opts) {
 
 FeedStream.prototype.retrieve = function (tuple, cb) {
   var me = this
-  me.db.get(keys.key(keys.FED, tuple), function (er, val) {
+    , db = me.db
+    , key = keys.key(keys.FED, tuple)
+
+  db.get(keys.key(keys.FED, tuple), function (er, val) {
     if (er) {
       me.error(er)
     } else if (val) {

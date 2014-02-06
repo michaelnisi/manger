@@ -38,7 +38,8 @@
     "tap": "0.4.x",
     "levelup": "0.18.x",
     "leveldown": "0.10.x",
-    "stread": "0.0.x"
+    "stread": "0.0.x",
+    "routes": "0.2.x"
   },
   "engines": {
     "node": "0.11.x",

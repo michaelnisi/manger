@@ -13,9 +13,22 @@ function loc () {
   return '/tmp/mangerdb'
 }
 
+var opts
 function decorate (req, db) {
-  req.opts = manger.opts(db)
+  if (!opts) opts = manger.opts(db)
+  req.opts = opts
   return req
+}
+
+function route (req, res) {
+  var rt = routes.match(req.url)
+    , fn = rt ? rt.fn : null
+  if (fn) {
+    fn(req, res)
+  } else {
+    res.writeHead(404)
+    res.end('not found\n')
+  }
 }
 
 function start (er, db) {
@@ -41,8 +54,3 @@ function entries (req, res) {
     .pipe(res)
 }
 
-function route (req, res) {
-  var route = routes.match(req.url)
-    , fn = route ? route.fn : null
-  fn ? fn(req, res) : res.end('go away')
-}
