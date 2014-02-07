@@ -35,6 +35,7 @@ function start (er, db) {
   assert(!er)
   routes.addRoute('/feeds', feeds)
   routes.addRoute('/entries', entries)
+  routes.addRoute('/update', update)
   http.createServer(function (req, res) {
     route(decorate(req, db), res)
   }).listen(1337)
@@ -51,6 +52,11 @@ function entries (req, res) {
   req
     .pipe(manger.queries())
     .pipe(manger.entries(req.opts))
+    .pipe(res)
+}
+
+function update (req, res) {
+  manger.update(req.opts)
     .pipe(res)
 }
 

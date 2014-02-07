@@ -104,7 +104,7 @@ function tuple (uri, time) {
   return [uri, time || Date.UTC(1970, 0)]
 }
 
-// Request via HTTP or retrieve from store.
+// Request over the wire or retrieve from store.
 // - tuple tuple()
 ATransform.prototype._transform = function (tuple, enc, cb) {
   var me = this
@@ -315,37 +315,47 @@ URLStream.prototype.info = function (x) {
   if (this.log) this.log.info(x)
 }
 
+// Boring housekeeping for update streams
+function handleUpdate (log, reader, urls, writer) {
+  function error (x) {
+    if (log) log.error(x)
+    debug(x)
+  }
+  function onReaderEnd () {
+    reader.removeListener('error', error)
+    reader.removeListener('end', onReaderEnd)
+  }
+  function onUrlsFinish() {
+    reader.unpipe()
+    urls.removeListener('error', error)
+    urls.removeListener('finish', onUrlsFinish)
+  }
+  function onWriterFinish () {
+    urls.unpipe()
+    writer.removeListener('error', error)
+    writer.removeListener('finish', onWriterFinish)
+  }
+  reader.on('error', error)
+  reader.on('end', onReaderEnd)
+  urls.on('error', error)
+  urls.on('finish', onUrlsFinish)
+  writer.on('error', error)
+  writer.on('finish', onWriterFinish)
+}
+
+// TODO: Fix
 // Update all feeds (including entries) in store
 // - opts opts()
 function update (opts) {
   opts.mode = 1
   var db = opts.db
+    , log = opts.log
     , reader = db.createValueStream({ start:keys.FED })
     , urls = new URLStream(opts)
     , writer = new FeedStream(opts)
-
-  function onReaderEnd () {
-    reader.removeListener('error', me.error)
-    reader.removeListener('end', onReaderEnd)
-  }
-  function onUrlsFinish() {
-    reader.unpipe()
-    urls.removeListener('error', me.error)
-    urls.removeListener('finish', onUrlsFinish)
-  }
-  function onWriterFinish () {
-    urls.unpipe()
-    writer.removeListener('error', me.error)
-    writer.removeListener('finish', onWriterFinish)
-  }
-  reader.on('error', me.error)
-  reader.on('end', onReaderEnd)
-  urls.on('error', me.error)
-  urls.on('finish', onUrlsFinish)
-  writer.on('error', me.error)
-  writer.on('finish', onWriterFinish)
-
-  return reader.pipe(urls).pipe(writer)
+//  handleUpdate(log, reader, urls, writer)
+  reader.pipe(urls).pipe(writer)
+  return writer
 }
 
 // Dictionary of request streams currently in-flight

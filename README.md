@@ -64,11 +64,97 @@ To see this, try:
 node example/feeds.js | json -a title
 ```
 
+### HTTP Server
+```js
+var http = require('http')
+  , levelup = require('levelup')
+  , routes = require('routes')()
+  , assert = require('assert')
+  , manger = require('manger')
+
+levelup(loc(), null, start)
+
+function loc () {
+  return '/tmp/mangerdb'
+}
+
+var opts
+function decorate (req, db) {
+  if (!opts) opts = manger.opts(db)
+  req.opts = opts
+  return req
+}
+
+function route (req, res) {
+  var rt = routes.match(req.url)
+    , fn = rt ? rt.fn : null
+  if (fn) {
+    fn(req, res)
+  } else {
+    res.writeHead(404)
+    res.end('not found\n')
+  }
+}
+
+function start (er, db) {
+  assert(!er)
+  routes.addRoute('/feeds', feeds)
+  routes.addRoute('/entries', entries)
+  routes.addRoute('/update', update)
+  http.createServer(function (req, res) {
+    route(decorate(req, db), res)
+  }).listen(1337)
+}
+
+function feeds (req, res) {
+  req
+    .pipe(manger.queries())
+    .pipe(manger.feeds(req.opts))
+    .pipe(res)
+}
+
+function entries (req, res) {
+  req
+    .pipe(manger.queries())
+    .pipe(manger.entries(req.opts))
+    .pipe(res)
+}
+
+function update (req, res) {
+  manger.update(req.opts)
+    .pipe(res)
+}
+```
+
+You might run this server (after you'd `npm install`):
+```
+node example/server.js &
+```
+Get feeds:
+```
+curl -sS -d '{[{"url":"feeds.muleradio.net/thetalkshow"}, {"url":"http://5by5.tv/hd"}]}' http://localhost:1337/feeds | json
+
+```
+Get Entries:
+```
+curl -sS -d '{[{"url":"http://feeds.5by5.tv/b2w"}, {"url":"http://5by5.tv/dlc"}]}' http://localhost:1337/feeds | json
+
+```
+Get Entries within time interval from now to since:
+```
+curl -sS -d '{[{"url":"http://5by5.tv/rss", "since":"1391212800000"}]}' http://localhost:1337/entries | json -a title
+```
+
+Update all the things (confining output to titles):
+```
+curl -sS http://localhost:1337/update | json -a title
+```
+
 ## API
 
 The manger module leverages the lexicographical key sort order of Leveldb to implement a cache for RSS and Atom formatted XML feeds. The keys are optimized to stream feeds or entries in time ranges between now and some point in the past. The API speaks JSON.
 
-The distinction between feed and entries may seem dubious. A feed is the meta information of an RSS or Atom feed (title, author, published, etc.), while entries are the actual items in the feed. These are separated in manger to not repeatedly transmit feed information. Essentially this package tries to limit number of requests and data transfers.
+The distinction between feed and entries may seem dubious. A feed is the meta information of an RSS or Atom feed (title, author, published, etc.), while entries are the actual items in the feed. These are separated in manger to not repeatedly transmit feed information. Essentially this package tries to limit the number of requests and data transfers.
 
 In the default mode(`3`) all data is retrieved from the cache, if a requested feed isn't cached yet, it is requested and stored in the cache before it is returned. To keep the cache up to date the update function has to be applied regularly. This is an expensive operation which will harm performance if done too frequently.
 
