@@ -134,20 +134,17 @@ Get feeds:
 ```
 curl -sS -d '{[{"url":"feeds.muleradio.net/thetalkshow"}, {"url":"http://5by5.tv/hd"}]}' \ 
 http://localhost:1337/feeds | json
-
 ```
 Get Entries:
 ```
 curl -sS -d '{[{"url":"http://feeds.5by5.tv/b2w"}, {"url":"http://5by5.tv/dlc"}]}' \ 
 http://localhost:1337/feeds | json
-
 ```
 Get Entries within time interval from now to since:
 ```
 curl -sS -d '{[{"url":"http://5by5.tv/rss", "since":"1391212800000"}]}' \ 
 http://localhost:1337/entries | json -a title
 ```
-
 Update all the things (confining output to titles):
 ```
 curl -sS http://localhost:1337/update | json -a title
