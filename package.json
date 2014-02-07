@@ -1,6 +1,6 @@
 {
   "name": "manger",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "cache feeds",
   "main": "index.js",
   "directories": {
