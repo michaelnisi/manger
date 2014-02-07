@@ -4,7 +4,6 @@
 var http = require('http')
   , levelup = require('levelup')
   , routes = require('routes')()
-  , bunyan = require('bunyan')
   , assert = require('assert')
   , manger = require('../')
 
