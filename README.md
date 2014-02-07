@@ -138,12 +138,12 @@ http://localhost:1337/feeds | json
 Get Entries:
 ```
 curl -sS -d '{[{"url":"http://feeds.5by5.tv/b2w"}, {"url":"http://5by5.tv/dlc"}]}' \ 
-http://localhost:1337/feeds | json
+http://localhost:1337/entries | json
 ```
 Get Entries within time interval from now to since:
 ```
 curl -sS -d '{[{"url":"http://5by5.tv/rss", "since":"1391212800000"}]}' \ 
-http://localhost:1337/entries | json -a title
+http://localhost:1337/entries
 ```
 Update all the things (confining output to titles):
 ```
