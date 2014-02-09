@@ -61,19 +61,21 @@ test('non-flowing mode', function (t) {
 })
 
 test('tuple', function (t) {
-  t.plan(3)
+  t.plan(4)
   var f = queries.tuple
-  var expected = [
+  var found = [
     ['http://5by5.tv/rss', 0]
   , ['http://5by5.tv/rss', 0]
   , ['http://5by5.tv/rss', 1387106898]
+  , ['http://5by5.tv/rss', 1118862000000]
   ]
   ;[
     {url:'http://5by5.tv/rss'}
   , {url:'http://5by5.tv/rss', since:0}
   , {url:'http://5by5.tv/rss', since:1387106898}
+  , {url:'http://5by5.tv/rss', since:'Wed, 15 Jun 2005 19:00:00 GMT'}
   ].forEach(function (term, i) {
-    t.deepEqual(f(term), expected[i])
+    t.deepEqual(f(term), found[i])
   })
   t.end()
 })

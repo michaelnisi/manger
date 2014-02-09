@@ -80,7 +80,7 @@ function loc () {
 
 var opts
 function decorate (req, db) {
-  if (!opts) opts = manger.opts(db)
+  opts = opts || manger.opts(db)
   req.opts = opts
   return req
 }
@@ -126,28 +126,28 @@ function update (req, res) {
 }
 ```
 
-You might run this server (after you'd `npm install`):
+You might try this server (after you'd `npm install`) by doing:
 ```
-$ node example/server.js &
+node example/server.js &
 ```
 Get feeds:
 ```
-$ curl -sS -d '[{"url":"feeds.muleradio.net/thetalkshow"}, {"url":"http://5by5.tv/hd"}]' \ 
+curl -sS -d '[{"url":"feeds.muleradio.net/thetalkshow"}, {"url":"http://5by5.tv/hd"}]' \ 
   http://localhost:1337/feeds | json
 ```
 Get Entries:
 ```
-$ curl -sS -d '[{"url":"http://feeds.5by5.tv/b2w"}, {"url":"http://5by5.tv/dlc"}]' \ 
+curl -sS -d '[{"url":"http://feeds.5by5.tv/b2w"}, {"url":"http://5by5.tv/dlc"}]' \ 
   http://localhost:1337/entries | json
 ```
 Get Entries within time interval from now to since:
 ```
-$ curl -sS -d '[{"url":"http://5by5.tv/rss", "since":"1391212800000"}]' \
+curl -sS -d '[{"url":"http://5by5.tv/rss", "since":1391212800000}]' \
   http://localhost:1337/entries
 ```
 Update all the things (confining output to titles):
 ```
-$ curl -sS http://localhost:1337/update | json -a title
+curl -sS http://localhost:1337/update | json -a title
 ```
 
 ## API
@@ -176,7 +176,8 @@ Bag of options, where only `db` is required. Remember that a database cannot be 
 The entries duplex stream is a stream of entries which are defined by [pickup](https://github.com/michaelnisi/pickup) (a streaming parser).
 
 - [entry()](https://github.com/michaelnisi/pickup#evententry)
-- tuple() [String(), Date.UTC()]
+- time() Unix Time || IETF-compliant RFC 2822 timestamp
+- tuple() [String(), time()]
 
 Write tuples to it:
 
