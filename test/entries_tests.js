@@ -43,7 +43,14 @@ test('put/get', function (t) {
     manger.getEntry(common.db(), [uri, 1380578400000], function (er, val) {
       t.ok(!er, 'should not error')
       t.ok(!!val, 'should be defined')
-      var found = JSON.parse(val), wanted = entry
+
+      function parse(val) {
+        return JSON.parse(val)
+      }
+
+      var found = parse(val)
+        , wanted = entry
+
       t.is(found.title, wanted.title)
       t.is(found.updated, wanted.updated)
       t.ok(!er, 'should not error')
@@ -52,13 +59,12 @@ test('put/get', function (t) {
   })
 })
 
-/*
 test('pipe', function (t) {
   var f = manger.entries
   t.ok(f, 'should be defined')
   function json () {
     return JSON.stringify([
-      { url:'localhost:1337/logbuch-netzpolitik.xml'
+      { url:'http://localhost:1337/ddc.xml'
       , since:Date.UTC(2013, 9)
       }
     ])
@@ -76,8 +82,8 @@ test('pipe', function (t) {
       })
       .on('finish', function () {
         var found = JSON.parse(data)
-        // TODO: test
-        console.error(found)
+        t.ok(found.length > 0)
+        // TODO: Write meaningful tests
         t.end()
       })
   }
@@ -86,7 +92,6 @@ test('pipe', function (t) {
     .pipe(f(opts()))
     .on('finish', retrieve)
 })
-*/
 
 test('teardown', function (t) {
   common.teardown(t)
