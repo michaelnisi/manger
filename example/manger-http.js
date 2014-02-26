@@ -1,5 +1,5 @@
 
-// server - serve cached feeds
+// manger-http - serve cached feeds
 
 var http = require('http')
   , levelup = require('levelup')

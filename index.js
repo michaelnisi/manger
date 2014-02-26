@@ -170,8 +170,13 @@ ATransform.prototype.respond = function (res) {
     me.error(er)
   }
 
+  function decorateFeed (feed) {
+    feed.feed = uri // TODO: Name
+    return feed
+  }
+
   function onFeed (feed) {
-    feed.feed = uri // TODO: Better name
+    feed = decorateFeed(feed)
     if (me.pushFeeds) {
       me.push(me.prepend(JSON.stringify(feed)))
     }
@@ -180,8 +185,15 @@ ATransform.prototype.respond = function (res) {
     })
   }
 
+  // Add some handy things
+  function decorateEntry (entry) {
+    entry.feed = uri
+    entry.updated = new Date(date(entry)).getTime()
+    return entry
+  }
+
   function onEntry (entry) {
-    entry.feed = uri // just so we know
+    entry = decorateEntry(entry)
     if (me.pushEntries && newer(date(entry), tuple)) {
       me.push(me.prepend(JSON.stringify(entry)))
     }

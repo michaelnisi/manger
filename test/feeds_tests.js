@@ -54,7 +54,6 @@ test('pipe', function (t) {
     .pipe(writer)
 })
 
-/*
 test('update', function (t) {
   t.plan(2)
   var f = manger.update, r = ''
@@ -67,13 +66,12 @@ test('update', function (t) {
       function parse () {
         feeds = JSON.parse(r)
         console.error(feeds)
-        t.is(feeds.length, 1) // in prev test we put one feed without etag
+        t.is(feeds.length, 5)
       }
       t.doesNotThrow(parse)
       t.end()
     })
 })
-*/
 
 function opts () {
   return manger.opts(common.db())

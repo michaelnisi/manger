@@ -64,92 +64,6 @@ To see this, try:
 node example/feeds.js | json -a title
 ```
 
-### HTTP Server
-```js
-var http = require('http')
-  , levelup = require('levelup')
-  , routes = require('routes')()
-  , assert = require('assert')
-  , manger = require('manger')
-
-levelup(loc(), null, start)
-
-function loc () {
-  return '/tmp/mangerdb'
-}
-
-var opts
-function decorate (req, db) {
-  opts = opts || manger.opts(db)
-  req.opts = opts
-  return req
-}
-
-function route (req, res) {
-  var rt = routes.match(req.url)
-    , fn = rt ? rt.fn : null
-  if (fn) {
-    fn(req, res)
-  } else {
-    res.writeHead(404)
-    res.end('not found\n')
-  }
-}
-
-function start (er, db) {
-  assert(!er)
-  routes.addRoute('/feeds', feeds)
-  routes.addRoute('/entries', entries)
-  routes.addRoute('/update', update)
-  http.createServer(function (req, res) {
-    route(decorate(req, db), res)
-  }).listen(1337)
-}
-
-function feeds (req, res) {
-  req
-    .pipe(manger.queries())
-    .pipe(manger.feeds(req.opts))
-    .pipe(res)
-}
-
-function entries (req, res) {
-  req
-    .pipe(manger.queries())
-    .pipe(manger.entries(req.opts))
-    .pipe(res)
-}
-
-function update (req, res) {
-  manger.update(req.opts)
-    .pipe(res)
-}
-```
-
-You might try this server (after you'd `npm install`) by doing:
-```
-node example/server.js &
-```
-Get feeds:
-```
-curl -sS -d '[{"url":"feeds.muleradio.net/thetalkshow"}, {"url":"http://5by5.tv/hd"}]' \ 
-  http://localhost:1337/feeds | json
-```
-Get Entries:
-```
-curl -sS -d '[{"url":"http://feeds.5by5.tv/b2w"}, {"url":"http://5by5.tv/dlc"}]' \ 
-  http://localhost:1337/entries | json
-```
-Get Entries within time interval from now to since:
-```
-curl -sS -d '[{"url":"http://5by5.tv/rss", "since":1391212800000}]' \
-  http://localhost:1337/entries
-```
-Update all the things (confining output to titles):
-```
-curl -sS http://localhost:1337/update | json -a title
-```
-
 ## API
 
 The manger module leverages the lexicographical key sort order of Leveldb to implement a cache for RSS and Atom formatted XML feeds. The keys are optimized to stream feeds or entries in time ranges between now and some point in the past. The API speaks JSON.
@@ -211,7 +125,7 @@ The update function updates the whole cache, it returns a readable stream of the
 
 A convenience duplex stream to transform JSON strings to manger tuples. Write JSON strings or buffers with content of following format:
 ```js
-[{"url":String(), "since":Date.UTC()}, ...]
+[{"url":String(), "since":time(), ...]
 ```
 and read tuple(). 
 
