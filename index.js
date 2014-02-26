@@ -188,7 +188,7 @@ ATransform.prototype.respond = function (res) {
   // Add some handy things
   function decorateEntry (entry) {
     entry.feed = uri
-    entry.updated = new Date(date(entry)).getTime()
+    entry.updated = Date.parse(entry.updated)
     return entry
   }
 
@@ -396,7 +396,7 @@ function land (uid, etag) {
 // - entry The entry object
 // - cb(er, key)
 function putEntry (db, uri, entry, cb) {
-  var key = keys.key(keys.ENT, [uri, Date.parse(entry.updated)])
+  var key = keys.key(keys.ENT, [uri, entry.updated])
   entry.feed = uri
   db.put(key, JSON.stringify(entry), function (er) {
     cb(er, key)
