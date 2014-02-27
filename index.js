@@ -187,7 +187,7 @@ ATransform.prototype.respond = function (res) {
 
   function decorateEntry (entry) {
     entry.feed = uri
-    entry.time = new Date(date(entry)).getTime()
+    entry.time = date(entry).getTime() / 1000
     return entry
   }
 
