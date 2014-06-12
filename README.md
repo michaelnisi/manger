@@ -1,7 +1,7 @@
 
 # manger - cache feeds 
 
-The manger [Node.js](http://nodejs.org/) module caches RSS and Atom formatted XML feeds using [LevelUP](https://github.com/rvagg/node-levelup). It supports aggregated requests with individual time intervals (from now). I use it in a mobile service which needs to get all updated entries of multiple feeds and time spans with a single request.
+The manger [Node](http://nodejs.org/) module caches RSS and Atom formatted XML feeds using [LevelUP](https://github.com/rvagg/node-levelup). It supports aggregated requests with individual time intervals (from now). I use it in a mobile service which needs to get all updated entries of multiple feeds and time spans with a single request.
 
 [![Build Status](https://secure.travis-ci.org/michaelnisi/manger.svg)](http://travis-ci.org/michaelnisi/manger) [![David DM](https://david-dm.org/michaelnisi/manger.svg)](http://david-dm.org/michaelnisi/manger)
 
@@ -32,7 +32,9 @@ Limit the range by supplying a date:
 echo '[{ "url":"http://5by5.tv/rss", "since":"2014-06-07" }]' | node example/stdin.js | json -a title
 ```
 
-The manger module leverages the lexicographical key sort order of Leveldb to implement a cache for RSS and Atom formatted XML feeds. The keys are designed to stream feeds or entries in time ranges between now and some point in the past. The API speaks objects and JSON.
+## Description
+
+The manger module leverages the lexicographical key sort order of LevelDB to implement a cache for RSS and Atom formatted XML feeds. The keys are designed to stream feeds or entries in time ranges between now and some point in the past. The API speaks objects and JSON.
 
 The distinction between feed and entries may seem dubious. A feed is the meta information of an RSS or Atom feed (title, author, published, etc.), while entries are the actual items in the feed. These are separated in manger to not repeatedly transmit feed information. Inherently manger tries to limit the number of requests and data transfers.
 
@@ -44,24 +46,60 @@ A [LevelUP](https://github.com/rvagg/node-levelup) data store.
 
 ### mode()
 
-A `Number()` to set manger's mode.
+A `Number(1 | 2 | 3)` to set manger's mode.
 
-    - `1` ignore cached data and request all over the wire
-    - `2` retrieve data from cache if possible (default)
-    - `3` use `HEAD` requests comparing ETags to decide which feeds to update
+- `1` ignore cached data and request all over the wire
+- `2` retrieve data from cache if possible (default)
+- `3` use `HEAD` requests comparing ETags to decide which feeds to update
 
 ### log()
 
-For optional logging a [bunyan](https://github.com/trentm/node-bunyan) instance.
+An optional [bunyan](https://github.com/trentm/node-bunyan) instance for integrated logging.
 
 ### feed()
 
-A container for [metadata](https://github.com/michaelnisi/pickup#eventfeed)
- associated with the feed.
+A container for metadata associated with the feed.
+
+- `feed`
+    - `author`
+    - `copyright`
+    - `feed`
+    - `id`
+    - `image`
+    - `language`
+    - `link`
+    - `payment`
+    - `subtitle`
+    - `summary` 
+    - `title`
+    - `ttl`
+    - `updated`
+
+### enclosure()
+
+A related resource of an entry().
+
+- `enclosure`
+    - `href`
+    - `length`
+    - `type`
 
 ### entry()
 
-An individual [entry](https://github.com/michaelnisi/pickup#evententry).
+An individual entry.
+
+- `entry`
+    - `author`
+    - `enclosure()`
+    - `duration`
+    - `feed`
+    - `id`
+    - `image`
+    - `link`
+    - `subtitle`
+    - `summary`
+    - `title`
+    - `updated`
 
 ## exports
 
@@ -69,7 +107,7 @@ An individual [entry](https://github.com/michaelnisi/pickup#evententry).
 
 ### opts(db(), mode(), log())
 
-Bag of options, where only `db` is required. Remember that a LevelDB database cannot be opened by parallel Node processes.
+Bag of options, where only `db` is required. Remember that a LevelDB database cannot be opened by multiple Node processes at once.
 
 ### entries(opts())
 

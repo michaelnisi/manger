@@ -369,7 +369,6 @@ function update (opts) {
     , queries = new URLsToQueries(opts)
     , feeds = new Feeds(opts)
     ;
-  piperr(urls, queries, feeds)
   urls.pipe(queries).pipe(feeds)
   return feeds
 }
