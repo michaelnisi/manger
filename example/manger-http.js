@@ -5,6 +5,7 @@ var http = require('http')
   , levelup = require('levelup')
   , routes = require('routes')()
   , assert = require('assert')
+  , bunyan = require('bunyan')
   , manger = require('../')
 
 levelup(loc(), null, start)
@@ -13,10 +14,24 @@ function loc () {
   return '/tmp/mangerdb'
 }
 
-var opts
+function log () {
+  return bunyan.createLogger({
+    name: 'manger-http'
+  , streams: [{
+      level: 'error',
+      path: '/tmp/manger-http.log'
+    }]
+  })
+}
+
+var _opts
+function opts (db) {
+  if (!_opts) _opts = manger.opts(db, 1 | 2, log())
+  return _opts
+}
+
 function decorate (req, db) {
-  opts = opts || manger.opts(db)
-  req.opts = opts
+  req.opts = opts(db)
   return req
 }
 
@@ -59,4 +74,3 @@ function update (req, res) {
   manger.update(req.opts)
     .pipe(res)
 }
-

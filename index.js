@@ -1,53 +1,48 @@
 
 // manger - cache feeds
 
+module.exports = manger
+
+module.exports.entries = Entries
+module.exports.feeds = Feeds
+module.exports.list = list
 module.exports.opts = Opts
-module.exports.feeds = FeedStream
-module.exports.entries = EntryStream
 module.exports.update = update
-module.exports.queries = require('./lib/queries').queries
 
-if (process.env.NODE_TEST) {
-  module.exports.putETag = putETag
-  module.exports.getETag = getETag
-  module.exports.putFeed = putFeed
-  module.exports.getFeed = getFeed
-  module.exports.putEntry = putEntry
-  module.exports.getEntry = getEntry
-  module.exports.stale = stale
-  module.exports.newer = newer
-  module.exports.flights = flights
-}
+var queries = require('./lib/queries')
+module.exports.queries = queries
+module.exports.query = queries.query
 
-var pickup = require('pickup')
+var assert = require('assert')
+  , duplexer = require('duplexer')
   , http = require('http')
-  , assert = require('assert')
-  , stream = require('stream')
-  , util = require('util')
-  , url = require('url')
-  , string_decoder = require('string_decoder')
   , keys = require('./lib/keys')
+  , pickup = require('pickup')
   , requests = require('./lib/requests')
+  , stream = require('stream')
+  , string_decoder = require('string_decoder')
+  , url = require('url')
+  , util = require('util')
+  ;
 
 var debug
 if (process.env.NODE_DEBUG || process.env.NODE_TEST) {
-  debug = function (o) { console.error('**manger: %s', o) }
+  debug = function (o) {
+    console.error('**manger: %s', o)
+  }
 } else {
-  debug = function () { }
+  debug = function () {}
 }
 
-// @doc
-function mode (k) {
-  return {
-    'fresh': 1
-  , 'cache': 2
-  , 'smart': 3
-  }[k]
+var Mode = {
+  WIRE:  1
+, CACHE: 2
+, HEAD:  3
 }
 
-// Options
+// Options to configure these streams.
 // - db levelup()
-// - mode mode()
+// - mode Mode
 // - log bunyan()
 function Opts (db, mode, log) {
   if (!(this instanceof Opts)) return new Opts(db, mode, log)
@@ -56,164 +51,168 @@ function Opts (db, mode, log) {
   this.log = log
 }
 
-// Abstract base class for manger transforms
+// Validate options and add default option values.
+// - opts Opts()
+function defaults (opts) {
+  if (!opts || !opts.db) throw new Error('no db')
+  return new Opts(opts.db, opts.mode || Mode.CACHE, opts.log)
+}
+
+// Abstract base class for manger transform streams.
 // - Opts()
-util.inherits(ATransform, stream.Transform)
-function ATransform (opts) {
-  if (!(this instanceof ATransform)) return new ATransform(opts)
-  stream.Transform.call(this)
+util.inherits(Manger, stream.Transform)
+function Manger (opts) {
+  if (!(this instanceof Manger)) return new Manger(opts)
+  opts = defaults(opts)
+  stream.Transform.call(this, opts)
+  util._extend(this, opts)
   this._writableState.objectMode = true
   this._readableState.objectMode = false
   this.pushFeeds = false
   this.pushEntries = true
-  this.db = opts.db
-  this.mode = opts.mode || 1 | 2
-  this.log = opts.log
   this.state = 0
+  this.run = [this.wire, this.cache, this.head][this.mode - 1]
 }
 
-ATransform.prototype._flush = function (cb) {
+Manger.prototype._flush = function (cb) {
+  // TODO: Would new-line-seperated JSON be better?
   var chunk = this.state === 0 ? '[]' : ']'
   this.push(chunk)
   cb()
 }
 
-var MODS = ['[', ',']
-
-ATransform.prototype.prepend = function (str) {
-  var s = MODS[this.state] + str
+var CHARS = ['[', ',']
+Manger.prototype.prepend = function (str) {
+  var s = CHARS[this.state] + str
   if (this.state === 0) this.state = 1
   return s
 }
 
-ATransform.prototype.destroy = function () {
-  this.db = null
-  this.log = null
-  release([this])
+Manger.prototype.destroy = function () {
+  this.db = this.log = null
+  free(this)
 }
 
-// - tuple tuple()
-function uri (tuple) {
-  return tuple[0]
+function stored (er, etag) {
+  return !er && !!etag
 }
 
-// @doc
-// - uri Uniform resource identifier
-// - time Coordinated Universal Time (optional)
-function tuple (uri, time) {
-  return [uri, time || Date.UTC(1970, 0)]
+Manger.prototype.wire = function (query, enc, cb) {
+  this.request(query, cb)
 }
 
-// Request over the wire or retrieve from store.
-// - tuple tuple()
-ATransform.prototype._transform = function (tuple, enc, cb) {
+Manger.prototype.cache = function (query, enc, cb) {
   var me = this
-  getETag(me.db, uri(tuple), function (er, etag) {
-    var mode = me.mode
-    if (mode === 2 || mode !== 1 && !er && etag) {
-      me.retrieve(tuple, cb)
+  getETag(this.db, query, function (er, etag) {
+    if (!stored(er, etag)) {
+      me.request(query, cb)
     } else {
-      requests.changed(etag, uri(tuple), function (er, yes) {
-        if (yes) {
-          me.request(tuple, cb)
-        } else {
-          me.retrieve(tuple, cb)
-        }
-      })
+      me.retrieve(query, cb)
     }
   })
 }
 
-ATransform.prototype.uid = function (uri) {
+Manger.prototype.head = function (query, enc, cb) {
+  var me = this
+  function go (fresh, query, cb) {
+    fresh ? me.request(query, cb) : me.retrieve(query, cb)
+  }
+  getETag(me.db, query, function (er, etag) {
+    if (stored(er, etag)) {
+      requests.changed(etag, query.url, function (er, yes) {
+        go(yes, query, cb)
+      })
+    } else {
+      go(true, query, cb)
+    }
+  })
+}
+
+// Request over the wire or retrieve from store.
+// - query query()
+// Here the modes: 1 | 2 | 3 = wire | cache | head
+Manger.prototype._transform = function (query, enc, cb) {
+  if (!query.url) {
+    cb(new Error('no url'))
+    return
+  }
+  this.run(query, enc, cb)
+}
+
+Manger.prototype.uid = function (uri) {
   return [this.db.location, uri].join('~')
 }
 
-ATransform.prototype.defer = function (tuple, cb) {
+Manger.prototype.defer = function (query, cb) {
   var stream, me = this
-  if (!!(stream = inFlight(me.uid(tuple[0])))) {
+  if (!!(stream = inFlight(me.uid(query.url)))) {
     function later () {
       stream.removeListener('end', later)
-      me.retrieve(tuple, cb)
+      me.retrieve(query, cb)
     }
     stream.on('end', later)
   }
   return !!stream
 }
 
-ATransform.prototype.request = function (tuple, cb) {
-  var me = this
-  var req = http.get(uri(tuple), function (res) {
-    me.respond(decorate(res, tuple, cb))
-  })
-  function error (er) {
-    req.removeListener('error', error)
-    me.error(er)
-    cb() // TODO: Review
-  }
-  req.on('error', error)
-}
-
-function decorate (res, tuple, cb) {
-  res.tuple = tuple
+function decorate (res, query, cb) {
+  res.query = query
   res.cb = cb
   return res
 }
 
-ATransform.prototype.respond = function (res) {
+Manger.prototype.request = function (query, cb) {
   var me = this
-    , tuple = res.tuple
-    , uri = res.tuple[0]
+  var req = http.get(query.url, function (res) {
+    me.respond(decorate(res, query, cb))
+  })
+  function error (er) {
+    req.removeListener('error', error)
+    me.error(er)
+    cb() // Keep calm and just continue with the next.
+  }
+  req.on('error', error)
+}
+
+Manger.prototype.respond = function (res) {
+  var me = this
+    , query = res.query
+    , uri = query.url
     , cb = res.cb
     , parser = pickup()
-
+    ;
   function onError (er) {
     me.error(er)
+    cb(er)
   }
-
-  function decorateFeed (feed) {
-    feed.feed = uri
-    return feed
-  }
-
   function onFeed (feed) {
-    feed = decorateFeed(feed)
-    if (me.pushFeeds) {
-      me.push(me.prepend(JSON.stringify(feed)))
-    }
+    feed.feed = uri
+    feed.updated = time(feed)
     putFeed(me.db, uri, feed, function (er) {
       if (er) me.error(er)
+      if (me.pushFeeds && newer(feed, query)) {
+        me.push(me.prepend(JSON.stringify(feed)))
+      }
     })
   }
-
-  function decorateEntry (entry) {
-    entry.feed = uri
-    entry.time = date(entry).getTime() / 1000
-    return entry
-  }
-
   function onEntry (entry) {
-    entry = decorateEntry(entry)
-    if (me.pushEntries && newer(date(entry), tuple)) {
-      me.push(me.prepend(JSON.stringify(entry)))
-    }
+    entry.feed = uri
+    entry.updated = time(entry)
     putEntry(me.db, uri, entry, function (er) {
       if (er) me.error(er)
+      if (me.pushEntries && newer(entry, query)) {
+        me.push(me.prepend(JSON.stringify(entry)))
+      }
     })
   }
-
   function onFinish () {
-    res.unpipe()
-    parser.removeListener('error', onError)
-    parser.removeListener('feed', onFeed)
-    parser.removeListener('entry', onEntry)
-    parser.removeListener('finish', onFinish)
     putETag(me.db, uri, etag(res), function (er) {
-      if (er) me.error(er)
       land(me.uid(uri))
+      free(res, parser)
+      if (er) me.error(er)
       cb(er)
     })
   }
-
   parser.on('error', onError)
   parser.on('feed', onFeed)
   parser.on('entry', onEntry)
@@ -227,156 +226,162 @@ function etag(res) {
   return res.headers['etag']
 }
 
-ATransform.prototype.toString = function () {
+Manger.prototype.toString = function () {
   return ['Manger ', this.constructor.name].join()
 }
 
-ATransform.prototype.error = function (x) {
+Manger.prototype.error = function (x) {
   if (this.log) this.log.error(x)
   debug(x)
 }
 
-ATransform.prototype.info = function (x) {
+Manger.prototype.info = function (x) {
   if (this.log) this.log.info(x)
   debug(x)
 }
 
-// Stream feeds
-util.inherits(FeedStream, ATransform)
-function FeedStream (opts) {
-  if (!(this instanceof FeedStream)) return new FeedStream(opts)
-  ATransform.call(this, opts)
+// A stream of feeds.
+util.inherits(Feeds, Manger)
+function Feeds (opts) {
+  if (!(this instanceof Feeds)) return new Feeds(opts)
+  Manger.call(this, opts)
   this.pushFeeds = true
   this.pushEntries = false
 }
 
-FeedStream.prototype.retrieve = function (tuple, cb) {
+Feeds.prototype.retrieve = function (query, cb) {
   var me = this
     , db = me.db
-    , key = keys.key(keys.FED, tuple)
-
-  db.get(keys.key(keys.FED, tuple), function (er, val) {
+    , key = keys.key(keys.FED, query)
+    ;
+  db.get(keys.key(keys.FED, query), function (er, val) {
     if (er) {
       me.error(er)
+      if (er.notFound) {
+        me.request(query, cb)
+      } else {
+        cb(er)
+      }
     } else if (val) {
-      var str = me.prepend(val)
-      me.push(str)
+      me.push(me.prepend(val))
+      cb()
     }
-    cb()
   })
 }
 
-// Stream entries
-util.inherits(EntryStream, ATransform)
-function EntryStream (opts) {
-  if (!(this instanceof EntryStream)) return new EntryStream(opts)
-  ATransform.call(this, opts)
+// A stream of entries.
+util.inherits(Entries, Manger)
+function Entries (opts) {
+  if (!(this instanceof Entries)) return new Entries(opts)
+  Manger.call(this, opts)
 }
 
-EntryStream.prototype.retrieve = function (tuple, cb) {
+// TODO: If the etags get out of sync, we're fucked!
+Entries.prototype.retrieve = function (query, cb) {
   var me = this
-    , start = keys.key(keys.ENT, tuple)
-    , end = keys.key(keys.ENT, [tuple[0], Date.now()])
+    , start = keys.key(keys.ENT, query)
+    , end = keys.key(keys.ENT, queries.query(query.url, Date.now()))
     , stream = me.db.createValueStream({start:start, end:end})
-
+    ;
   function push (value) {
     var str = me.prepend(value)
     me.push(str)
   }
-
   function done () {
     stream.removeListener('data', push)
     stream.removeListener('error', me.error)
     stream.removeListener('end', done)
     cb()
   }
-
   stream.on('data', push)
   stream.on('error', me.error)
   stream.on('end', done)
 }
 
-// Transfrom stream values to tuples
-util.inherits(URLStream, stream.Transform)
-function URLStream (opts) {
-  if (!(this instanceof URLStream)) return new URLStream(db)
-  stream.Transform.call(this)
-  this._writableState.objectMode = false
-  this._readableState.objectMode = true
-  this.log = opts.log
-  this.db = opts.db
+function manger (db) {
+  var input = queries()
+    , opts = new Opts(db)
+    , entries = new Entries(opts)
+    ;
+  input.pipe(entries)
+  return duplexer(input, entries)
 }
 
-URLStream.prototype._transform = function (chunk, enc, cb) {
-  var str = decode(chunk)
-  try {
-    var tuple = [JSON.parse(str).feed]
-    this.push(tuple)
-  } catch (er) {
-    this.error(er)
-  }
+// List all feeds currently in store.
+util.inherits(List, stream.Transform)
+function List (opts) {
+  if (!(this instanceof List)) return new List(opts)
+  stream.Transform.call(this, opts)
+}
+
+List.prototype.decode = function (chunk) {
+  var decoder = this.decoder
+    || (this.decoder = new string_decoder.StringDecoder())
+  return decoder.write(chunk)
+}
+
+List.prototype._transform = function (chunk, enc, cb) {
+  var url = this.decode(chunk).split(keys.FED + keys.DIV)[1]
+  this.push(url)
   cb()
 }
 
-URLStream.prototype.error = function (x) {
-  if (this.log) this.log.error(x)
+function piperr () {
+  Array.prototype.slice(arguments).forEach(function (stream) {
+    stream.on('error', debug)
+  })
 }
 
-URLStream.prototype.info = function (x) {
-  if (this.log) this.log.info(x)
+// A readable stream of all subscribed feeds in the store.
+function list (opts) {
+  opts = defaults(opts)
+  var read = opts.db.createKeyStream(keys.ALL_FEEDS)
+    , write = new List({encoding:'utf8'})
+    ;
+  piperr(read, write)
+  return read.pipe(write)
 }
 
-// Boring housekeeping for update streams
-function handleUpdate (log, reader, urls, writer) {
-  function error (x) {
-    if (log) log.error(x)
-    debug(x)
-  }
-  function onReaderEnd () {
-    reader.removeListener('error', error)
-    reader.removeListener('end', onReaderEnd)
-  }
-  function onUrlsFinish() {
-    reader.unpipe()
-    urls.removeListener('error', error)
-    urls.removeListener('finish', onUrlsFinish)
-  }
-  function onWriterFinish () {
-    urls.unpipe()
-    writer.removeListener('error', error)
-    writer.removeListener('finish', onWriterFinish)
-  }
-  reader.on('error', error)
-  reader.on('end', onReaderEnd)
-  urls.on('error', error)
-  urls.on('finish', onUrlsFinish)
-  writer.on('error', error)
-  writer.on('finish', onWriterFinish)
+util.inherits(URLsToQueries, stream.Transform)
+function URLsToQueries (opts) {
+  if (!(this instanceof URLsToQueries)) return new URLsToQueries(opts)
+  stream.Transform.call(this, opts)
+  util._extend(this, opts)
+  this._readableState.objectMode = true
+  this.decoder = new string_decoder.StringDecoder()
 }
 
-// TODO: Fix
-// Update all feeds (including entries) in store
-// - opts opts()
+URLsToQueries.prototype._transform = function (chunk, enc, cb) {
+  var it
+  try {
+    it = queries.query(this.decoder.write(chunk))
+  } catch (er) {
+    cb(er)
+  }
+  this.push(it)
+  cb()
+}
+
+// Updates entire store and returns readable stream of feeds.
 function update (opts) {
-  opts.mode = 1
-  var db = opts.db
-    , log = opts.log
-    , reader = db.createValueStream({ start:keys.FED })
-    , urls = new URLStream(opts)
-    , writer = new FeedStream(opts)
-//  handleUpdate(log, reader, urls, writer)
-  reader.pipe(urls).pipe(writer)
-  return writer
+  opts.mode = Mode.HEAD
+  var urls = list(opts)
+    , queries = new URLsToQueries(opts)
+    , feeds = new Feeds(opts)
+    ;
+  piperr(urls, queries, feeds)
+  urls.pipe(queries).pipe(feeds)
+  return feeds
 }
 
+// TODO: Remove global state
 // Dictionary of request streams currently in-flight
 var _flights
 function flights () {
-  if (!_flights) _flights = Object.create(null)
-  return _flights
+  return _flights || (_flights = Object.create(null))
 }
 
-// - uid ATransform.prototype.uid()
+// - uid Manger.prototype.uid()
 function inFlight (uid) {
   return flights()[uid]
 }
@@ -385,7 +390,7 @@ function fly (uid, stream) {
   flights()[uid] = stream
 }
 
-function land (uid, etag) {
+function land (uid) {
   flights()[uid] = null
 }
 
@@ -395,7 +400,7 @@ function land (uid, etag) {
 // - entry The entry object
 // - cb(er, key)
 function putEntry (db, uri, entry, cb) {
-  var key = keys.key(keys.ENT, [uri, Date.parse(entry.updated)])
+  var key = keys.key(keys.ENT, queries.query(uri, entry.updated))
   entry.feed = uri
   db.put(key, JSON.stringify(entry), function (er) {
     cb(er, key)
@@ -404,20 +409,21 @@ function putEntry (db, uri, entry, cb) {
 
 // Get stored entry.
 // - db levelup()
-// - tuple tuple()
+// - query query()
 // - cb cb(er, val)
-function getEntry(db, tuple, cb) {
-  db.get(keys.key(keys.ENT, tuple), cb)
+function getEntry(db, query, cb) {
+  db.get(keys.key(keys.ENT, query), cb)
 }
 
 // Put feed into store
 // - db levelup()
-// - uri http://some.where/feed.xml
+// - uri String()
 // - cb cb(er, key)
 function putFeed(db, uri, feed, cb) {
-  var key = keys.key(keys.FED, [uri])
+  var key = keys.key(keys.FED, queries.query(uri))
   feed.feed = uri
-  db.put(key, JSON.stringify(feed), function (er) {
+  var data = JSON.stringify(feed)
+  db.put(key, data, function (er) {
     cb(er, key)
   })
 }
@@ -427,54 +433,61 @@ function putFeed(db, uri, feed, cb) {
 // - uri http://example.org/feed.xml
 // - cb cb(er, val)
 function getFeed (db, uri, cb) {
-  db.get(keys.key(keys.FED, [uri]), cb)
+  db.get(keys.key(keys.FED, queries.query(uri)), cb)
 }
 
 function putETag(db, uri, etag, cb) {
-  db.put(keys.key(keys.ETG, [uri]), etag, cb)
+  db.put(keys.key(keys.ETG, queries.query(uri)), etag, cb)
 }
 
 // Get stored ETag for uri.
 // - db levelup()
-// - uri http://example.org/feed.xml
+// - query query()
 // - cb cb(er, val)
-function getETag (db, uri, cb) {
-  db.get(keys.key(keys.ETG, [uri]), cb)
+function getETag (db, query, cb) {
+  db.get(keys.key(keys.ETG, query), cb)
 }
 
-// Release streams
-// - streams Array of stream objects
-function release (streams) {
-  streams.forEach(function (stream) {
-    stream.unpipe()
-    stream.removeAllListeners()
-  })
+// Free streams (passed as arguments).
+function free () {
+  Array.prototype.slice.call(arguments)
+    .forEach(function (stream) {
+      stream.unpipe()
+      stream.removeAllListeners()
+    })
 }
 
-// Decode utf8 binary to string
-// - buf utf8 encoded binary
-var decoder = new string_decoder.StringDecoder()
-function decode (buf) {
-  return decoder.write(buf)
-}
-
-// true if value is stale and should be updated
+// True if value is stale and should be updated.
 // - val The value to check
 // - mode The mode of the manger stream (1 | 2)
 function stale (val, mode) {
   var cached = !!val
     , fresh  = mode === 1
     , cache  = mode === 2
+    ;
   return (!cached || fresh) && !cache
 }
 
-function date (entry) {
-  return entry.updated ? new Date(entry.updated) : new Date()
+// Normalize dates of feeds or entries.
+// - thing feed() | entry()
+function time (thing) {
+  return queries.time(thing.updated)
 }
 
-// True if time is newer than the time in tuple.
-// - time Date.UTC()
-// - tuple tuple()
-function newer (time, tuple) {
-  return time > tuple[1]
+function newer (item, query) {
+  return item.updated > query.since
+}
+
+if (process.env.NODE_TEST) {
+  [
+    putETag
+  , getETag
+  , putFeed
+  , getFeed
+  , putEntry
+  , getEntry
+  , stale
+  , flights
+  , newer
+  ].forEach(function (f) { module.exports[f.name] = f })
 }

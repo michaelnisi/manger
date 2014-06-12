@@ -1,30 +1,49 @@
 
 var test = require('tap').test
   , stread = require('stread')
-  , queries = require('../').queries
   , common = require('./common')
   , manger = require('../')
+  , es = require('event-stream')
+  ;
 
 test('setup', function (t) {
   common.setup(t)
 })
 
-test('newer', function (t) {
-  t.plan(3)
-  var f = manger.newer
-  var wanted = [
-    false
-  , false
-  , true
-  ]
-  ;[
-    f(Date.UTC(1970, 0), [])
-  , f(Date.UTC(1970, 0), ['url', 0])
-  , f(Date.UTC(1970, 1), ['url', 0])
-  ].forEach(function (found, i) {
-    t.is(found, wanted[i])
-  })
-  t.end()
+function items (arr) {
+  return JSON.parse(arr.join(''))
+}
+
+function q (url, since) {
+  return manger.query(url, since)
+}
+
+function url (file) {
+  return common.url(file)
+}
+
+test('write', function (t) {
+  t.plan(9)
+  var f = manger.entries
+  t.ok(f, 'should be defined')
+
+  var entries = f(common.opts())
+  t.throws(function () { entries.write('xxx') })
+  t.ok(entries.write(q('http://xxx')), 'should just continue')
+  t.ok(entries.write(q(url('b2w.xml'), '2013-12-17')), 'should work')
+
+  entries.pipe(es.writeArray(function (er, arr) {
+    t.ok(!er)
+    var entries = items(arr)
+      , entry = entries[0]
+      ;
+    t.is(entries.length, 1)
+    t.is(entry.title, 'Back to Work 150: Ask for John Klumpp')
+    t.is(entry.updated, 1387317600000)
+    t.is(entry.feed, 'http://localhost:1337/b2w.xml')
+    t.end()
+  }))
+  entries.end()
 })
 
 test('put/get', function (t) {
@@ -32,15 +51,13 @@ test('put/get', function (t) {
   var f = manger.putEntry
   t.ok(f, 'should be defined')
   var uri = 'feeds.feedburner.com/cre-podcast'
-  var entry = {
-    title: 'Mavericks'
-  , updated: '2013-09-30T22:00:00.000Z'
-  }
+    , entry = { title:'Mavericks', updated:1380578400000 }
+  ;
   f(common.db(), uri, entry, function (er, key) {
     t.ok(!er, 'should not error')
     t.ok(key, 'should be defined')
-    t.is(key, 'ent\u0000e1bd8a1287db248534694f2cd83a6d49b9b8281a\u00001380578400000')
-    manger.getEntry(common.db(), [uri, 1380578400000], function (er, val) {
+    t.is(key, 'ent\u0000feeds.feedburner.com/cre-podcast\u00001380578400000')
+    manger.getEntry(common.db(), manger.query(uri, 1380578400000), function (er, val) {
       t.ok(!er, 'should not error')
       t.ok(!!val, 'should be defined')
 
@@ -75,7 +92,7 @@ test('pipe', function (t) {
   function retrieve () {
     var data = ''
     stread(json())
-      .pipe(queries())
+      .pipe(manger.queries())
       .pipe(f(opts()))
       .on('data', function (chunk) {
         data += chunk
@@ -88,9 +105,28 @@ test('pipe', function (t) {
       })
   }
   stread(json())
-    .pipe(queries())
+    .pipe(manger.queries())
     .pipe(f(opts()))
     .on('finish', retrieve)
+})
+
+test('populate', function (t) {
+  common.populate(t)
+})
+
+test('all entries', function (t) {
+  t.plan(1)
+  var queries = es.readArray(common.queries())
+    , write = es.writeArray(parse)
+    ;
+  function parse(er, found) {
+    var entries = JSON.parse(found.join(''))
+    t.is(entries.length, 376)
+    t.end()
+  }
+  queries
+    .pipe(manger.entries(common.opts()))
+    .pipe(write)
 })
 
 test('teardown', function (t) {

@@ -1,6 +1,8 @@
 
 var test = require('tap').test
   , keys = require('../lib/keys')
+  , query = require('../').query
+  ;
 
 test('env', function (t) {
   t.plan(1)
@@ -8,39 +10,30 @@ test('env', function (t) {
   t.end()
 })
 
+function url () {
+  return 'http://abc.def/ghi.jkl'
+}
+
 test('key', function (t) {
   var f = keys.key
-  t.plan(7)
+  t.plan(8)
   t.throws(function () { f(null) })
   t.throws(function () { f(undefined) })
-  t.throws(function () { f('WTF', []) })
-  t.throws(function () { f('WTF', ['http://example.org/feed.xml']) })
+  t.throws(function () { f('WTF', {}) })
+  t.throws(function () { f('WTF', query(url())) })
   var wanted = [
-    'fed\u0000a9993e364706816aba3e25717850c26c9cd0d89d'
-  , 'fed\u0000a9993e364706816aba3e25717850c26c9cd0d89d'
-  , 'ent\u000013d0edad47191e06a3c91b56746d3103657a296a\u00000'
+    'fed\u0000abc'
+  , 'fed\u0000abc'
+  , 'ent\u0000' + url() + '\u00000'
+  , 'etg\u0000' + url()
   ]
   ;[
-    f(keys.FED, ['abc'])
-  , f(keys.FED, ['abc', 0])
-  , f(keys.ENT, ['http://example.org/feed.xml', 0])
+    f(keys.FED, query('abc'))
+  , f(keys.FED, query('abc', 0))
+  , f(keys.ENT, query(url(), 0))
+  , f(keys.ETG, query(url()))
   ].forEach(function (found, i) {
     t.is(found, wanted[i])
   })
   t.end()
 })
-
-test('hash', function (t) {
-  t.plan(1)
-  var f = keys.hash
-    , wanted = [
-    'c417d8fa4f0bf2e41995de8e4221deb0e2d3403a'
-  ]
-  ;[
-    f('http://bit.ly/rss.xml')
-  ].forEach(function (found, i) {
-    t.is(found, wanted[i])
-  })
-  t.end()
-})
-

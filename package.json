@@ -1,6 +1,6 @@
 {
   "name": "manger",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "cache feeds",
   "main": "index.js",
   "directories": {
@@ -8,7 +8,9 @@
     "test": "test"
   },
   "scripts": {
-    "test": "test/test.sh"
+    "test": "test/test.sh",
+    "start": "node example/manger-http.js > /dev/null & echo $! > .pid",
+    "stop": "kill `< .pid`"
   },
   "repository": {
     "type": "git",
@@ -30,20 +32,21 @@
     "leveldb"
   ],
   "dependencies": {
-    "pickup": "0.3.x"
+    "pickup": "0.4.x",
+    "duplexer": "0.1.x",
+    "levelup": "0.18.x"
   },
   "devDependencies": {
     "rimraf": "2.2.x",
-    "st": "0.2.x",
+    "st": "0.4.x",
     "tap": "0.4.x",
-    "levelup": "0.18.x",
     "leveldown": "0.10.x",
     "stread": "0.0.x",
-    "routes": "0.2.x"
+    "event-stream": "3.1.x",
+    "routes": "1.1.x"
   },
   "engines": {
-    "node": "0.11.x",
-    "node": "0.10.x"
+    "node": ">= 0.10"
   },
   "license": "MIT",
   "author": {

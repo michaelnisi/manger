@@ -3,6 +3,7 @@ var test = require('tap').test
   , fs = require('fs')
   , common = require('./common')
   , requests = require('../lib/requests.js')
+  ;
 
 test('setup', function (t) {
   common.setup(t)
@@ -22,7 +23,7 @@ test('changed', function (t) {
   t.plan(4)
   var f = requests.changed
     , uri ='http://localhost:1337/rl.xml'
-
+    ;
   f(null, uri, function (er, changed) {
     t.ok(!er, 'should not error')
     t.ok(changed, 'should be changed')
