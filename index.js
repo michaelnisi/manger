@@ -43,7 +43,7 @@ var Mode = {
 // Options to configure these streams.
 // - db levelup()
 // - mode Mode
-// - log bunyan()
+// - log bunyan() | console
 function Opts (db, mode, log) {
   if (!(this instanceof Opts)) return new Opts(db, mode, log)
   this.db = db
@@ -55,7 +55,10 @@ function Opts (db, mode, log) {
 // - opts Opts()
 function defaults (opts) {
   if (!opts || !opts.db) throw new Error('no db')
-  return new Opts(opts.db, opts.mode || Mode.CACHE, opts.log)
+  return new Opts(
+    opts.db
+  , opts.mode || Mode.CACHE
+  , opts.log || { error:function () {} })
 }
 
 // Abstract base class for manger transform streams.
@@ -75,7 +78,6 @@ function Manger (opts) {
 }
 
 Manger.prototype._flush = function (cb) {
-  // TODO: Would new-line-seperated JSON be better?
   var chunk = this.state === 0 ? '[]' : ']'
   this.push(chunk)
   cb()
@@ -90,7 +92,8 @@ Manger.prototype.prepend = function (str) {
 
 Manger.prototype.destroy = function () {
   this.db = this.log = null
-  free(this)
+  this.unpipe()
+  this.removeAllListeners()
 }
 
 function stored (er, etag) {
@@ -104,6 +107,7 @@ Manger.prototype.wire = function (query, enc, cb) {
 Manger.prototype.cache = function (query, enc, cb) {
   var me = this
   getETag(this.db, query, function (er, etag) {
+    if (!!er) me.error(er)
     if (!stored(er, etag)) {
       me.request(query, cb)
     } else {
@@ -118,6 +122,7 @@ Manger.prototype.head = function (query, enc, cb) {
     fresh ? me.request(query, cb) : me.retrieve(query, cb)
   }
   getETag(me.db, query, function (er, etag) {
+    if (!!er) me.error(er)
     if (stored(er, etag)) {
       requests.changed(etag, query.url, function (er, yes) {
         go(yes, query, cb)
@@ -130,13 +135,14 @@ Manger.prototype.head = function (query, enc, cb) {
 
 // Request over the wire or retrieve from store.
 // - query query()
-// Here the modes: 1 | 2 | 3 = wire | cache | head
 Manger.prototype._transform = function (query, enc, cb) {
   if (!query.url) {
-    cb(new Error('no url'))
-    return
+    var er = new Error('no url')
+    this.error(er)
+    cb(er)
+  } else {
+    this.run(query, enc, cb)
   }
-  this.run(query, enc, cb)
 }
 
 Manger.prototype.uid = function (uri) {
@@ -169,7 +175,7 @@ Manger.prototype.request = function (query, cb) {
   function error (er) {
     req.removeListener('error', error)
     me.error(er)
-    cb() // Keep calm and just continue with the next.
+    cb()
   }
   req.on('error', error)
 }
@@ -181,15 +187,27 @@ Manger.prototype.respond = function (res) {
     , cb = res.cb
     , parser = pickup()
     ;
+  function free () {
+    res.unpipe(parser)
+    parser.removeAllListeners()
+    land(me.uid(uri))
+    res = null
+    me = null
+    query = null
+    uri = null
+    cb = null
+    parser = null
+  }
   function onError (er) {
     me.error(er)
-    cb(er)
+    cb()
+    free()
   }
   function onFeed (feed) {
     feed.feed = uri
     feed.updated = time(feed)
     putFeed(me.db, uri, feed, function (er) {
-      if (er) me.error(er)
+      if (!!er) me.error(er)
       if (me.pushFeeds && newer(feed, query)) {
         me.push(me.prepend(JSON.stringify(feed)))
       }
@@ -199,7 +217,7 @@ Manger.prototype.respond = function (res) {
     entry.feed = uri
     entry.updated = time(entry)
     putEntry(me.db, uri, entry, function (er) {
-      if (er) me.error(er)
+      if (!!er) me.error(er)
       if (me.pushEntries && newer(entry, query)) {
         me.push(me.prepend(JSON.stringify(entry)))
       }
@@ -207,10 +225,9 @@ Manger.prototype.respond = function (res) {
   }
   function onFinish () {
     putETag(me.db, uri, etag(res), function (er) {
-      land(me.uid(uri))
-      free(res, parser)
-      if (er) me.error(er)
+      if (!!er) me.error(er)
       cb(er)
+      free()
     })
   }
   parser.on('error', onError)
@@ -231,13 +248,8 @@ Manger.prototype.toString = function () {
 }
 
 Manger.prototype.error = function (x) {
-  if (this.log) this.log.error(x)
-  debug(x)
-}
-
-Manger.prototype.info = function (x) {
-  if (this.log) this.log.info(x)
-  debug(x)
+  if (!!x && x.notFound) return
+  this.log.error(x)
 }
 
 // A stream of feeds.
@@ -303,6 +315,10 @@ function manger (db) {
     , opts = new Opts(db)
     , entries = new Entries(opts)
     ;
+  function error (er) {
+    console.error(er)
+  }
+  [input, entries].forEach(function (eve) { eve.on('error', error) })
   input.pipe(entries)
   return duplexer(input, entries)
 }
@@ -326,19 +342,16 @@ List.prototype._transform = function (chunk, enc, cb) {
   cb()
 }
 
-function piperr () {
-  Array.prototype.slice(arguments).forEach(function (stream) {
-    stream.on('error', debug)
-  })
-}
-
 // A readable stream of all subscribed feeds in the store.
 function list (opts) {
   opts = defaults(opts)
   var read = opts.db.createKeyStream(keys.ALL_FEEDS)
     , write = new List({encoding:'utf8'})
     ;
-  piperr(read, write)
+  function error (er) {
+    opts.log.error(er)
+  }
+  [read, write].forEach(function (eve) { eve.on('error', error) })
   return read.pipe(write)
 }
 
@@ -369,6 +382,10 @@ function update (opts) {
     , queries = new URLsToQueries(opts)
     , feeds = new Feeds(opts)
     ;
+  function error (er) {
+    opts.log.error(er)
+  }
+  [urls, queries, feeds].forEach(function (eve) { eve.on('error', error) })
   urls.pipe(queries).pipe(feeds)
   return feeds
 }
@@ -445,15 +462,6 @@ function putETag(db, uri, etag, cb) {
 // - cb cb(er, val)
 function getETag (db, query, cb) {
   db.get(keys.key(keys.ETG, query), cb)
-}
-
-// Free streams (passed as arguments).
-function free () {
-  Array.prototype.slice.call(arguments)
-    .forEach(function (stream) {
-      stream.unpipe()
-      stream.removeAllListeners()
-    })
 }
 
 // True if value is stale and should be updated.

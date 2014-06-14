@@ -1,6 +1,6 @@
 {
   "name": "manger",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "cache feeds",
   "main": "index.js",
   "directories": {
@@ -8,9 +8,7 @@
     "test": "test"
   },
   "scripts": {
-    "test": "test/test.sh",
-    "start": "node example/manger-http.js > /dev/null & echo $! > .pid",
-    "stop": "kill `< .pid`"
+    "test": "test/test.sh"
   },
   "repository": {
     "type": "git",
@@ -32,7 +30,7 @@
     "leveldb"
   ],
   "dependencies": {
-    "pickup": "0.4.x",
+    "pickup": "0.5.x",
     "duplexer": "0.1.x",
     "levelup": "0.18.x"
   },

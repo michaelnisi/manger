@@ -46,7 +46,7 @@ A [LevelUP](https://github.com/rvagg/node-levelup) data store.
 
 ### mode()
 
-A `Number(1 | 2 | 3)` to set manger's mode.
+A `Number(1 | 2 | 3)` to set manger's mode (optional).
 
 - `1` ignore cached data and request all over the wire
 - `2` retrieve data from cache if possible (default)
@@ -54,7 +54,7 @@ A `Number(1 | 2 | 3)` to set manger's mode.
 
 ### log()
 
-An optional [bunyan](https://github.com/trentm/node-bunyan) instance for integrated logging.
+The `console` module or a [bunyan](https://github.com/trentm/node-bunyan) instance for integrated error logging (optional).
 
 ### feed()
 
@@ -130,10 +130,10 @@ A readable stream of URL String() of all subscribed feeds in the store.
 A convenience duplex stream to transform JSON strings to manger queries. The stream expects input of the form:
 
 ```js
-'[{"url": "URL String()", "since":"Date String(). The string should be in a format recognized by Date.parse()"}, ...]'
+'[{"url": "http://5by5.tv/rss", "since": "2014-06"}, ...]'
 ```
 
-This makes it easy to pipe to manger. For example `http` requests:
+This makes it easy to pipe to manger (`http` requests, say):
 
 ```js
 http.request()

@@ -23,13 +23,14 @@ function url (file) {
 }
 
 test('write', function (t) {
-  t.plan(9)
+  t.plan(10)
   var f = manger.entries
   t.ok(f, 'should be defined')
 
   var entries = f(common.opts())
   t.throws(function () { entries.write('xxx') })
   t.ok(entries.write(q('http://xxx')), 'should just continue')
+  t.ok(entries.write(q(url('broken.xml'))), 'should just continue')
   t.ok(entries.write(q(url('b2w.xml'), '2013-12-17')), 'should work')
 
   entries.pipe(es.writeArray(function (er, arr) {
