@@ -23,6 +23,7 @@ var assert = require('assert')
   , string_decoder = require('string_decoder')
   , url = require('url')
   , util = require('util')
+  , zlib = require('zlib')
   ;
 
 var debug
@@ -150,7 +151,9 @@ Manger.prototype.uid = function (uri) {
 }
 
 Manger.prototype.defer = function (query, cb) {
-  var stream, me = this
+  var stream
+    , me = this
+    ;
   if (!!(stream = inFlight(me.uid(query.url)))) {
     function later () {
       stream.removeListener('end', later)
@@ -236,7 +239,15 @@ Manger.prototype.respond = function (res) {
   parser.on('finish', onFinish)
 
   fly(me.uid(uri), parser) // TODO: Wonky!
-  res.pipe(parser).resume()
+
+  function stream () {
+    if (res.headers['content-encoding'] === 'gzip') {
+      var unzip = zlib.createGunzip()
+      return res.pipe(unzip).pipe(parser)
+    }
+    return res.pipe(parser)
+  }
+  stream().resume()
 }
 
 function etag(res) {
@@ -486,15 +497,13 @@ function newer (item, query) {
 }
 
 if (process.env.NODE_TEST) {
-  [
-    putETag
-  , getETag
-  , putFeed
-  , getFeed
-  , putEntry
-  , getEntry
-  , stale
-  , flights
-  , newer
-  ].forEach(function (f) { module.exports[f.name] = f })
+  [putETag
+ , getETag
+ , putFeed
+ , getFeed
+ , putEntry
+ , getEntry
+ , stale
+ , flights
+ , newer].forEach(function (f) { module.exports[f.name] = f })
 }
