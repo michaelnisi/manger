@@ -97,12 +97,12 @@ Manger.prototype.destroy = function () {
   this.removeAllListeners()
 }
 
-function stored (er, etag) {
-  return !er && !!etag
-}
-
 Manger.prototype.wire = function (query, enc, cb) {
   this.request(query, cb)
+}
+
+function stored (er, thing) {
+  return !er && !!thing
 }
 
 Manger.prototype.cache = function (query, enc, cb) {
@@ -189,9 +189,15 @@ Manger.prototype.respond = function (res) {
     , uri = query.url
     , cb = res.cb
     , parser = pickup()
+    , unzip = null
+    , count = 0
+    , finished = false
     ;
   function free () {
-    res.unpipe(parser)
+    assert(count === 0) // Obey me
+    if (unzip) {
+      unzip.removeAllListeners()
+    }
     parser.removeAllListeners()
     land(me.uid(uri))
     res = null
@@ -200,37 +206,53 @@ Manger.prototype.respond = function (res) {
     uri = null
     cb = null
     parser = null
+    unzip = null
+    finished = false
   }
-  function onError (er) {
-    me.error(er)
+  function done () {
     cb()
     free()
   }
+  // Abort but ignore externally.
+  function onError (er) {
+    me.error(er)
+    count = 0
+    done()
+  }
   function onFeed (feed) {
+    count++
     feed.feed = uri
     feed.updated = time(feed)
     putFeed(me.db, uri, feed, function (er) {
+      count--
       if (!!er) me.error(er)
       if (me.pushFeeds && newer(feed, query)) {
         me.push(me.prepend(JSON.stringify(feed)))
       }
+      if (finished && count === 0) done()
     })
   }
   function onEntry (entry) {
+    count++
     entry.feed = uri
     entry.updated = time(entry)
     putEntry(me.db, uri, entry, function (er) {
+      count--
       if (!!er) me.error(er)
       if (me.pushEntries && newer(entry, query)) {
         me.push(me.prepend(JSON.stringify(entry)))
       }
+      if (finished && count === 0) done()
     })
   }
   function onFinish () {
+    function finish () {
+      if (count === 0) done()
+      finished = true
+    }
     putETag(me.db, uri, etag(res), function (er) {
       if (!!er) me.error(er)
-      cb(er)
-      free()
+      finish()
     })
   }
   parser.on('error', onError)
@@ -242,16 +264,18 @@ Manger.prototype.respond = function (res) {
 
   function stream () {
     if (res.headers['content-encoding'] === 'gzip') {
-      var unzip = zlib.createGunzip()
-      return res.pipe(unzip).pipe(parser)
+      unzip = zlib.createGunzip()
+      unzip.on('error', onError)
     }
-    return res.pipe(parser)
+    return !!unzip ? res.pipe(unzip).pipe(parser) : res.pipe(parser)
   }
+
   stream().resume()
 }
 
 function etag(res) {
-  return res.headers['etag']
+  var h = res.headers
+  return h['etag'] || h['Etag'] || h['ETag'] || h['ETAG'] || 0
 }
 
 Manger.prototype.toString = function () {
@@ -475,17 +499,6 @@ function getETag (db, query, cb) {
   db.get(keys.key(keys.ETG, query), cb)
 }
 
-// True if value is stale and should be updated.
-// - val The value to check
-// - mode The mode of the manger stream (1 | 2)
-function stale (val, mode) {
-  var cached = !!val
-    , fresh  = mode === 1
-    , cache  = mode === 2
-    ;
-  return (!cached || fresh) && !cache
-}
-
 // Normalize dates of feeds or entries.
 // - thing feed() | entry()
 function time (thing) {
@@ -493,7 +506,7 @@ function time (thing) {
 }
 
 function newer (item, query) {
-  return item.updated > query.since
+  return item.updated >= query.since
 }
 
 if (process.env.NODE_TEST) {
@@ -503,7 +516,6 @@ if (process.env.NODE_TEST) {
  , getFeed
  , putEntry
  , getEntry
- , stale
  , flights
  , newer].forEach(function (f) { module.exports[f.name] = f })
 }
