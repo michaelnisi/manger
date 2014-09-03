@@ -1,16 +1,16 @@
 
 // common - setup test db, etc.
 
-module.exports.db = db
-module.exports.dir = dir
-module.exports.loc = loc
-module.exports.opts = opts
-module.exports.populate = populate
-module.exports.queries = queries
-module.exports.setup = setup
-module.exports.teardown = teardown
-module.exports.url = url
-module.exports.urls = urls
+exports.db = db
+exports.dir = dir
+exports.loc = loc
+exports.opts = opts
+exports.populate = populate
+exports.queries = queries
+exports.setup = setup
+exports.teardown = teardown
+exports.url = url
+exports.urls = urls
 
 var fs = require('fs')
   , levelup = require('levelup')
@@ -63,12 +63,12 @@ function urls () {
 }
 
 function queries () {
-  return urls().map(function (feed) { return manger.query(feed) })
+  return urls().map(function (feed) { return new manger.Query(feed) })
 }
 
 function populate (t) {
   es.readArray(queries())
-    .pipe(manger.feeds(opts()))
+    .pipe(new manger.Feeds(opts()))
     .on('finish', function () {
       t.end()
     })
@@ -80,7 +80,7 @@ function db () {
 }
 
 function opts () {
-  return manger.opts(db())
+  return { db:db() }
 }
 
 function teardown (t) {

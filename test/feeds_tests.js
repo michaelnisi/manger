@@ -3,6 +3,7 @@ var common = require('./common')
   , es = require('event-stream')
   , fs = require('fs')
   , manger = require('../')
+  , query = require('../lib/query')
   , test = require('tap').test
   ;
 
@@ -10,18 +11,9 @@ test('setup', function (t) {
   common.setup(t)
 })
 
-test('constructor', function (t) {
-  var f = manger.list
-  t.plan(3)
-  t.ok(f, 'should be defined')
-  t.throws(f)
-  t.throws(function () { f({}) })
-  t.end()
-})
-
 test('empty list', function (t) {
   t.plan(2)
-  var f = manger.list
+  var f = manger.FeedURLs
   t.ok(f, 'should be defined')
   var urls = f(common.opts())
     , actual = []
@@ -44,7 +36,7 @@ function items (arr) {
 }
 
 function q (url, since) {
-  return manger.query(url, since)
+  return new manger.Query(url, since)
 }
 
 function url (file) {
@@ -52,27 +44,35 @@ function url (file) {
 }
 
 test('write', function (t) {
-  t.plan(11)
-  var f = manger.feeds
+  t.plan(8)
+  var f = manger.Feeds
   t.ok(f, 'should be defined')
-
   var feeds = f(common.opts())
-  t.throws(function () { feeds.write('xxx') })
-  t.ok(feeds.write(q('http://xxx')), 'should just continue')
-  t.ok(feeds.write(q(url('b2w.xml'))), 'should work')
-  t.ok(feeds.write(q(url('ddc.xml'), Date.now())), 'should be too old')
 
-  feeds.pipe(es.writeArray(function (er, arr) {
-    t.ok(!er)
-    var feeds = items(arr)
-    t.is(feeds.length, 1)
-    var feed = feeds[0]
-    t.is(feed.title, 'Back to Work')
-    t.is(feed.link, 'http://5by5.tv/b2w')
-    t.is(feed.updated, 1387317600000)
-    t.is(feed.feed, 'http://localhost:1337/b2w.xml')
+  var errors = []
+  feeds.on('error', function (er) {
+    errors.push(er)
+  })
+  var chunk
+    , chunks = ''
+    ;
+  feeds.on('readable', function () {
+    while (null !== (chunk = feeds.read())) {
+      chunks += chunk
+    }
+  })
+  feeds.on('finish', function () {
+    t.is(errors.length, 2)
+    var found = JSON.parse(chunks)
+    t.is(found.length, 1)
+    var first = found[0]
+    t.is(first.title, 'Back to Work')
     t.end()
-  }))
+  })
+  t.ok(feeds.write(q('xxx')))
+  t.ok(feeds.write(q('http://xxx')))
+  t.ok(feeds.write(q(url('b2w.xml'))), 'should be readable')
+  t.ok(feeds.write(q(url('ddc.xml'), Date.now())), 'should be too recent')
   feeds.end()
 })
 
@@ -105,7 +105,7 @@ test('populate', function (t) {
 
 test('list', function (t) {
   t.plan(1)
-  var urls = manger.list(common.opts())
+  var urls = new manger.FeedURLs(common.opts())
     , actual = []
     ;
   urls.on('readable', function () {
@@ -124,8 +124,8 @@ test('list', function (t) {
 test('pipe', function (t) {
   t.plan(2)
   var reader = fs.createReadStream('./queries/all.json')
-    , queries = manger.queries()
-    , writer = manger.feeds(common.opts())
+    , queries = new query.Queries()
+    , writer = new manger.Feeds(common.opts())
     , r = ''
     ;
   writer.on('data', function (chunk) {
@@ -156,7 +156,7 @@ test('all feeds', function (t) {
     t.end()
   }
   queries
-    .pipe(manger.feeds(common.opts()))
+    .pipe(new manger.Feeds(common.opts()))
     .pipe(write)
 })
 

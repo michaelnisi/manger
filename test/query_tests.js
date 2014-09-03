@@ -1,18 +1,17 @@
 
 var test = require('tap').test
   , fs = require('fs')
-  , queries = require('../lib/queries')
+  , query = require('../lib/query')
   , stread = require('stread')
   ;
 
 test('setup', function (t) {
-  t.plan(1)
   t.ok(process.env.NODE_TEST, 'should be test environment')
   t.end()
 })
 
 test('query', function (t) {
-  var f = queries.query
+  var f = query.Query
   t.throws(f)
   var wanted = [
     f('abc', 0)
@@ -30,25 +29,24 @@ test('query', function (t) {
   t.end()
 })
 
-function query (url, since) {
-  return new queries.query(url, since)
-}
-
 function all() {
+  var f = query.Query
   return [
-    query('http://localhost:1337/b2w.xml', 0)
-  , query('http://localhost:1337/ddc.xml', 0)
-  , query('http://localhost:1337/rl.xml', 0)
-  , query('http://localhost:1337/rz.xml', 0)
-  , query('http://localhost:1337/tal.xml', 0)
+    f('http://localhost:1337/b2w.xml', 0)
+  , f('http://localhost:1337/ddc.xml', 0)
+  , f('http://localhost:1337/rl.xml', 0)
+  , f('http://localhost:1337/rz.xml', 0)
+  , f('http://localhost:1337/tal.xml', 0)
   ]
 }
 
 test('flowing mode', function (t) {
   t.plan(1)
   var actual = []
+    , f = query.Queries()
+    ;
   fs.createReadStream('./queries/all.json')
-    .pipe(queries())
+    .pipe(f)
     .on('error', function (er) {
       t.ok(!er, 'should not error')
     })
@@ -61,11 +59,35 @@ test('flowing mode', function (t) {
     })
 })
 
+test('request', function (t) {
+  var f = query.Query
+  var found = [
+    f('http://abc.def/ghi.jkl').request()
+  , f('http://abc.def/ghi.jkl', null, '123').request()
+  ];
+  [
+    { hostname:'abc.def'
+    , port:80
+    , path:'/ghi.jkl'
+    }
+  , { hostname:'abc.def'
+    , port:80
+    , path:'/ghi.jkl'
+    , headers: {
+        'If-None-Match': '123'
+      }
+    }
+  ].forEach(function (req, i) {
+    t.same(found[i], req)
+  })
+  t.end()
+})
+
 test('non-flowing mode', function (t) {
   t.plan(1)
   var data = fs.readFileSync('./queries/all.json')
     , reader = stread(data)
-    , writer = queries()
+    , writer = query.Queries()
     , actual = []
     ;
   writer
@@ -79,7 +101,7 @@ test('non-flowing mode', function (t) {
   function size () {
     return Math.round(Math.random() * 16) + 1
   }
-  (function write () {
+  function write () {
     var ok = true, chunk = null
     while (null !== (chunk = reader.read(size())) && ok) {
       ok = writer.write(chunk)
@@ -89,7 +111,6 @@ test('non-flowing mode', function (t) {
     } else {
       writer.end()
     }
-  })()
+  }
+  write()
 })
-
-

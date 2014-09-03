@@ -1,6 +1,6 @@
 {
   "name": "manger",
-  "version": "0.2.4",
+  "version": "1.0.0",
   "description": "cache feeds",
   "main": "index.js",
   "directories": {
@@ -29,27 +29,23 @@
     "levelup",
     "leveldb"
   ],
-  "dependencies": {
-    "pickup": "0.5.x",
-    "duplexer": "0.1.x",
-    "levelup": "0.18.x"
-  },
-  "devDependencies": {
-    "rimraf": "2.2.x",
-    "st": "0.4.x",
-    "tap": "0.4.x",
-    "leveldown": "0.10.x",
-    "stread": "0.0.x",
-    "event-stream": "3.1.x",
-    "routes": "1.1.x"
-  },
   "engines": {
     "node": ">= 0.10"
   },
   "license": "MIT",
-  "author": {
-    "name": "Michael Nisi",
-    "email": "michael.nisi@gmail.com",
-    "url": "http://michaelnisi.com"
-  }
+  "homepage": "https://github.com/michaelnisi/manger",
+  "dependencies": {
+    "levelup": "^0.18.6",
+    "pickup": "^0.5.2"
+  },
+  "devDependencies": {
+    "tap": "^0.4.9",
+    "event-stream": "^3.1.5",
+    "leveldown": "^0.10.2",
+    "rimraf": "^2.2.8",
+    "st": "^0.4.1",
+    "stread": "^0.0.2",
+    "routes": "^1.1.0"
+  },
+  "author": "Michael Nisi <michael.nisi@gmail.com> (http://michaelnisi.com/)"
 }

@@ -1,7 +1,7 @@
 
 var test = require('tap').test
-  , keys = require('../lib/keys')
-  , query = require('../').query
+  , key = require('../lib/key')
+  , manger = require('../')
   ;
 
 test('env', function (t) {
@@ -15,7 +15,7 @@ function url () {
 }
 
 test('key', function (t) {
-  var f = keys.key
+  var f = key
   t.plan(8)
   t.throws(function () { f(null) })
   t.throws(function () { f(undefined) })
@@ -28,10 +28,10 @@ test('key', function (t) {
   , 'etg\u0000' + url()
   ]
   ;[
-    f(keys.FED, query('abc'))
-  , f(keys.FED, query('abc', 0))
-  , f(keys.ENT, query(url(), 0))
-  , f(keys.ETG, query(url()))
+    f(key.FED, new manger.Query('abc'))
+  , f(key.FED, new manger.Query('abc', 0))
+  , f(key.ENT, new manger.Query(url(), 0))
+  , f(key.ETG, new manger.Query(url()))
   ].forEach(function (found, i) {
     t.is(found, wanted[i])
   })

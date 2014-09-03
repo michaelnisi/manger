@@ -5,15 +5,18 @@ var common = require('./common')
   , test = require('tap').test
   ;
 
-function update (t, length) {
-  t.plan(2)
-  manger.update(common.opts())
-    .pipe(es.writeArray(function (er, chunks) {
-      t.ok(!er, 'should not error')
-      var actual = JSON.parse(chunks.join(''))
-      t.is(actual.length, length)
-      t.end()
-    }))
+function update (t, plan, length) {
+  t.plan(plan)
+  var update = manger.update(common.opts())
+  update.on('error', function (er) {
+    t.is(er.message, 'no etag')
+  })
+  update.pipe(es.writeArray(function (er, chunks) {
+    t.ok(!er, 'should not error')
+    var actual = JSON.parse(chunks.join(''))
+    t.is(actual.length, length)
+    t.end()
+  }))
 }
 
 test('setup', function (t) {
@@ -21,7 +24,7 @@ test('setup', function (t) {
 })
 
 test('empty', function (t) {
-  update(t, 0)
+  update(t, 2, 0)
 })
 
 test('populate', function (t) {
@@ -29,7 +32,7 @@ test('populate', function (t) {
 })
 
 test('populated', function (t) {
-  update(t, 5)
+  update(t, 2, 0)
 })
 
 test('teardown', function (t) {
