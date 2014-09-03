@@ -87,6 +87,7 @@ A [Transform](http://nodejs.org/api/stream.html#stream_class_stream_transform) s
 
 ```js
 - write(query() || String()) Boolean()
+- read() Buffer() || String() || entry()
 ```
 
 ### cache.feeds()
@@ -95,6 +96,7 @@ A [Transform](http://nodejs.org/api/stream.html#stream_class_stream_transform) s
 
 ```js
 - write(query() || String()) Boolean()
+- read() Buffer() || String() || feed()
 ```
 
 ### cache.list()
