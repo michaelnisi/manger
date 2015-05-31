@@ -1,82 +1,87 @@
-
 # manger - cache feeds
 
-The **manger** [Node](http://nodejs.org/) module caches RSS and Atom formatted XML feeds using [LevelUP](https://github.com/rvagg/node-levelup). It aggregates updated entries of multiple feeds and time spans into a single request-response.
+The **manger** [Node](http://nodejs.org/) package caches RSS and Atom formatted XML feeds using [LevelUP](https://github.com/rvagg/node-levelup). It provides an interface to query entries by feed and time.
 
 [![Build Status](https://secure.travis-ci.org/michaelnisi/manger.svg)](http://travis-ci.org/michaelnisi/manger)
 
 ## types
 
-### db()
+### str()
 
-A [LevelUP](https://github.com/rvagg/node-levelup) data store.
-
-### opts()
-
-Options for a `Manger` instance.
-
-```js
-- db db()
-- readableObjectMode Boolean() | false
-```
+[`String()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String) | `undefined`
 
 ### feed()
 
 One metadata object per XML feed.
 
-```js
-- author String() | undefined
-- copyright String() | undefined
-- feed String() | undefined // the URL
-- id String() | undefined
-- image String() | undefined
-- language String() | undefined
-- link String() | undefined
-- payment String() | undefined
-- subtitle String() | undefined
-- summary String() | undefined
-- title String() | undefined
-- ttl String() | undefined
-- updated String() | undefined
-```
+- `author str()`
+- `copyright str()`
+- `feed str()`
+- `id str()`
+- `image str()`
+- `language str()`
+- `link str()`
+- `payment str()`
+- `subtitle str()`
+- `summary str()`
+- `title str()`
+- `ttl str()`
+- `updated str()`
+
 ### enclosure()
 
 A related resource of an entry().
 
-```js
-- href String() | undefined
-- length String() | undefined
-- type String() | undefined
-```
+- `href str()`
+- `length str()`
+- `type str()`
 
 ### entry()
 
 An individual entry.
 
-```js
-- author String() | undefined
-- enclosure enclosure() | undefined
-- duration String() | undefined
-- feed String() | undefined
-- id String() | undefined
-- image String() | undefined
-- link String() | undefined
-- subtitle String() | undefined
-- summary String() | undefined
-- title String() | undefined
-- updated String() | undefined
-```
+- `author str()`
+- `enclosure enclosure() | undefined`
+- `duration str()`
+- `feed str()`
+- `id str()`
+- `image str()`
+- `link str()`
+- `subtitle str()`
+- `summary str()`
+- `title str()`
+- `updated str()`
 
 ### query()
 
-```js
-- url String()
-- since Date() | undefined
-```
+A query to get a feed or entries of a feed in a time range between `Date.now()` and `since`.
+
+- `url String()`
+- `since Date() | undefined`
+- `etag String() | undefined` An [entity tag](http://en.wikipedia.org/wiki/HTTP_ETag)
+- `force Boolean() | false` Force update ignoring cache
+
+### opts()
+
+Options for a `Manger` instance.
+
+- `readableObjectMode Boolean() | false`
 
 ## exports
 
-The **manger** module exports a single function that returns a new `cache` object (an instance of `Manger`). To access the `Manger` class `require('manger')`. If the cache's `readableObjectMode` is set to `true`, results can be read as objects, otherwise as `Buffer` objects or strings forming an array in proper JSON.
+### manger(name, opts)
+
+- `name String()` The name of the file system directory for the database
+- `opts opts()`
+
+The **manger** module exports a single function that returns a new `cache` object (an instance of `Manger`). To access the `Manger` class `require('manger')`.
+
+```js
+var manger = require('manger')
+var cache = manger('/tmp/manger.db')
+```
+
+If options has `readableObjectMode` set to `true`, results are read as `Object` types, otherwise they are `Buffer` or `String` moulding valid JSON, depending of which stream of the API is used.
 
 **manger** leverages the lexicographical key sort order of [LevelDB](http://leveldb.org/). The keys are designed to stream feeds or entries in time ranges between now and some point in the past.
 
@@ -84,37 +89,55 @@ The distinction between feed and entries may not be clear. A feed models the met
 
 ### cache.entries()
 
-A [Transform](http://nodejs.org/api/stream.html#stream_class_stream_transform) stream that transforms queries or URL strings to entries.
+A [Transform](http://nodejs.org/api/stream.html#stream_class_stream_transform) stream that transforms queries or URLs to entries.
 
-```js
-- write(query() || String()) Boolean()
-- read() Buffer() || String() || entry()
-```
+- `write(Buffer() | String() | query())` returns `Boolean()`
+- `read()` returns `Buffer() | String() | entry()`
 
 ### cache.feeds()
 
 A [Transform](http://nodejs.org/api/stream.html#stream_class_stream_transform) stream that transforms queries or URL strings to feeds.
 
-```js
-- write(query() || String()) Boolean()
-- read() Buffer() || String() || feed()
-```
+- `write(query() | String())` returns `Boolean()`
+- `read()` returns `Buffer() | String() | feed()`
 
 ### cache.list()
 
 A [Readable](http://nodejs.org/api/stream.html#stream_class_stream_readable_1) stream of URLs of all feeds currently cached.
 
-```js
-- read() Buffer() || String()
-```
+- `read() Buffer() | String()`
 
 ### cache.update()
 
-Updates all cached feeds and returns a [Readable](http://nodejs.org/api/stream.html#stream_class_stream_readable_1) stream of updated feed objects. **manger** applies ETags to reduce traffic.
+Updates all cached feeds and returns a [Readable](http://nodejs.org/api/stream.html#stream_class_stream_readable_1) stream `feed()` objects representing feeds that have been updated. This is a serial—potentially long running—operation. If possible feeds are updated ordered by popularity.
 
-```js
-- read() Buffer() || String() || feed()
-```
+- `read() Buffer() | String() | feed()`
+
+### cache.ranks()
+
+A [Readable](http://nodejs.org/api/stream.html#stream_class_stream_readable_1) stream of URLs sorted by rank (highest first).
+
+- `read() Buffer() | String()`
+
+### cache.resetRanks()
+
+Resets the ranks index.
+
+### cache.flushCounter()
+
+**manger** keeps an in-memory count of how many times feeds are accessed. This function flushes the counter to disk updating the ranks index.
+
+## additional exports
+
+The **manger** module decorates the exported `Manger` constructor with some convencience functions for querying.
+
+### manger.query(url, since, etag, force)
+
+A failable `query()` factory function returning a valid `query()` or `null`.
+
+### manger.queries()
+
+A convenience transform of JSON string buffers to queries which can be piped to `feeds()` and `entries()` streams.
 
 ## Installation
 
