@@ -16,14 +16,14 @@ test('queries and requests', function (t) {
     // are emitted for each of those.
     var wanted = [
       'invalid query',
-      'getaddrinfo ENOTFOUND xxx',
+      'getaddrinfo ENOTFOUND',
       'invalid query'
     ]
     s.on('finish', function () {
       t.same(JSON.parse(buf), [])
       t.is(found.length, wanted.length)
       wanted.forEach(function (it) {
-        t.is(found.shift().message, it)
+        t.ok(found.shift().message.match(new RegExp(it)))
       })
     })
     function write (uris) {

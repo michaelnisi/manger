@@ -57,14 +57,15 @@ An individual entry.
 A query to get a feed or entries of a feed in a time range between `Date.now()` and `since`.
 
 - `url String()`
-- `since Date() | undefined`
+- `since` [`Date()`](https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Global_Objects/Date) `| undefined`
 - `etag String() | undefined` An [entity tag](http://en.wikipedia.org/wiki/HTTP_ETag)
-- `force Boolean() | false` Force update ignoring cache
+- `force` [`Boolean()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Boolean) `| false` Force update ignoring cache
 
 ### opts()
 
 Options for a `Manger` instance.
 
+- `cacheSize Number() | 8 * 1024 * 1024` Passed to [levelup()](https://github.com/Level/levelup#ctor)
 - `readableObjectMode Boolean() | false`
 
 ## exports
@@ -81,7 +82,7 @@ var manger = require('manger')
 var cache = manger('/tmp/manger.db')
 ```
 
-If options has `readableObjectMode` set to `true`, results are read as `Object` types, otherwise they are `Buffer` or `String` moulding valid JSON, depending of which stream of the API is used.
+If options has `readableObjectMode` set to `true`, results are read as `Object` types, otherwise they are [`Buffer`](https://nodejs.org/api/buffer.html) or `String` moulding valid [JSON](http://json.org/), depending of which stream of the API is used.
 
 **manger** leverages the lexicographical key sort order of [LevelDB](http://leveldb.org/). The keys are designed to stream feeds or entries in time ranges between now and some point in the past.
 
@@ -129,7 +130,7 @@ Resets the ranks index.
 
 ## additional exports
 
-The **manger** module decorates the exported `Manger` constructor with some convencience functions for querying.
+The **manger** module decorates the exported `Manger` constructor with some convenience functions for querying.
 
 ### manger.query(url, since, etag, force)
 
@@ -137,7 +138,20 @@ A failable `query()` factory function returning a valid `query()` or `null`.
 
 ### manger.queries()
 
-A convenience transform of JSON string buffers to queries which can be piped to `feeds()` and `entries()` streams.
+This stream transforms JSON to queries which can be piped to `feeds()` and `entries()` streams. The expected JSON input format:
+
+```js
+[
+  { "url": "http://feeds.5by5.tv/directional" },
+  { "url": "http://www.newyorker.com/feed/posts",
+    "since": 1433083971124 },
+  { "url": "https://www.joyent.com/blog/feed",
+    "since": "May 2015" },
+  ...
+]
+```
+
+Where `"since"` can be anything `Date()` is able to parse.
 
 ## Installation
 

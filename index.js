@@ -36,6 +36,7 @@ var debug = (function () {
 
 function Opts (opts) {
   opts = opts || Object.create(null)
+  this.cacheSize = opts.cacheSize || 8 * 1024 * 1024
   this.counterMax = opts.counterMax || 500
   this.failures = opts.failures || { set: nop, get: nop, has: nop }
   this.force = opts.force || false
@@ -495,7 +496,7 @@ URLs.prototype._transform = function (chunk, enc, cb) {
   cb()
 }
 
-// A readable stream of all feed URLs represented as strings.
+// TODO: Merge list and ranks into one
 function list (db, opts) {
   var keys = db.createKeyStream(schema.allFeeds)
   var uris = new URLs({ encoding: 'utf8', objectMode: true })
@@ -618,6 +619,7 @@ function Manger (name, opts) {
   events.EventEmitter.call(this)
 
   this.opts = defaults(opts)
+
   this.opts.failures = lru({ max: 500, maxAge: 36e5 * 24 })
   this.opts.redirects = lru({ max: 500, maxAge: 36e5 * 24 })
   this.counter = lru({ max: this.opts.counterMax })
