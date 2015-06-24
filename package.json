@@ -1,6 +1,6 @@
 {
   "name": "manger",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "cache feeds",
   "main": "index.js",
   "scripts": {
@@ -29,11 +29,13 @@
   "homepage": "https://github.com/michaelnisi/manger",
   "dependencies": {
     "bytewise": "^1.0.0",
+    "headary": "^1.0.0",
     "leveldown": "^1.0.6",
     "levelup": "^1.0.0",
     "lru-cache": "^2.6.2",
     "pickup": "^3.0.0",
-    "readable-stream": "^1.1.13"
+    "readable-stream": "^1.1.13",
+    "speculum": "^1.0.4"
   },
   "devDependencies": {
     "lino": "^1.0.0",

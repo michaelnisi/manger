@@ -12,14 +12,16 @@ test('query', function (t) {
     f('http://5by5.tv/rss\n', 'Thu Jan 01 1970 01:00:00 GMT+0100 (CET)'),
     f(' http://5by5.tv/rss ', '1970-01-01'),
     f(' 5by5.tv/rss '),
-    f('http://')
+    f('http://'),
+    f('feed://5by5.tv/rss')
   ]
   var wanted = [
     f('http://5by5.tv/rss', 0),
     f('http://5by5.tv/rss', 0),
     f('http://5by5.tv/rss', 0),
     null,
-    null
+    null,
+    f('http://5by5.tv/rss', 0)
   ]
   t.plan(wanted.length)
   wanted.forEach(function (it) {

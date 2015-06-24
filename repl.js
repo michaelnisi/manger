@@ -15,8 +15,9 @@ var ctx = repl.start({
   output: process.stdout
 }).context
 
-var svc = manger('/tmp/manger-repl', {
-  readableObjectMode: true
+var name = process.argv[2] || '/tmp/manger-repl'
+var svc = manger(name, {
+  objectMode: true
 })
 
 var entries = svc.entries()
@@ -28,8 +29,9 @@ var list = function () {
 }
 var update = function () {
   var s = svc.update()
-  s.on('query', function (q) { console.log(q.url) })
-  s.on('error', console.error)
+  s.on('error', function (er) {
+    console.error(er.stack)
+  })
   return s
 }
 var ranks = function () {
@@ -84,4 +86,5 @@ ctx.list = list
 ctx.ranks = ranks
 ctx.read = read
 ctx.resetRanks = resetRanks
+ctx.svc = svc
 ctx.update = update

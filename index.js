@@ -7,6 +7,7 @@ exports = module.exports = function (name, opts) {
 var assert = require('assert')
 var bytewise = require('bytewise')
 var events = require('events')
+var headary = require('headary')
 var http = require('http')
 var https = require('https')
 var levelup = require('levelup')
@@ -17,6 +18,7 @@ var rank = require('./lib/rank')
 var schema = require('./lib/schema')
 var stream = require('readable-stream')
 var string_decoder = require('string_decoder')
+var speculum = require('speculum')
 var util = require('util')
 var zlib = require('zlib')
 
@@ -41,7 +43,7 @@ function Opts (opts) {
   this.failures = opts.failures || { set: nop, get: nop, has: nop }
   this.force = opts.force || false
   this.highWaterMark = opts.highWaterMark
-  this.readableObjectMode = opts.readableObjectMode || false
+  this.objectMode = opts.objectMode || false
   this.redirects = opts.redirects || { set: nop, get: nop, has: nop }
 }
 
@@ -69,7 +71,7 @@ function MangerTransform (db, opts) {
   this.force = opts.force
   this.redirects = opts.redirects
 
-  this._readableState.objectMode = opts.readableObjectMode
+  this._readableState.objectMode = opts.objectMode
   this._writableState.objectMode = true
   this.db = db
   this.decoder = new string_decoder.StringDecoder()
@@ -109,42 +111,13 @@ function redirect (sc) {
   return sc >= 300 && sc < 400
 }
 
-// Set `ok` to `true` to signal that further action might be required.
-// For a `not modified`, for example, `ok` should be `false`.
-// To gradually tighten this up, unhandled HTTP status codes are
-// considered errors.
-function Headers (er, ok, url) {
-  this.er = er
-  this.ok = ok
-  this.url = url
-}
-
-function processHeaders (qry, res) {
-  var er
-  var statusCode = res.statusCode
-  if (statusCode === 304 || sameEtag(qry, res)) {
-    return new Headers(er, false)
-  } else if (redirect(statusCode)) {
-    var url = res.headers['location']
-    if (!!url && typeof url === 'string' && url !== qry.url) {
-      return new Headers(er, false, url)
-    }
-  } else if (statusCode === 200) {
-    return new Headers(er, true)
-  } else {
-    er = new Error(
-      'ignored HTTP status: ' + statusCode + ' from ' + qry.url)
-  }
-  return new Headers(er, false)
-}
-
 var protocols = { 'http:': http, 'https:': https }
 
 MangerTransform.prototype.head = function (qry, cb) {
   var opts = qry.request('HEAD')
   var mod = protocols[opts.protocol]
   var req = mod.request(opts, function (res) {
-    res.req.abort() // TODO: Validate
+    res.resume()
     cb(null, res)
     cb = nop
   })
@@ -158,8 +131,8 @@ MangerTransform.prototype.head = function (qry, cb) {
   req.end()
 }
 
-// A String to use as key for caching failed requests. The `method` is
-// necessary to differentiate between `GET` and `HEAD` requests.
+// A String used to cache failed requests. The `method` is necessary to
+// differentiate `GET` and `HEAD` requests.
 function failureKey (method, uri) {
   assert(typeof method === 'string', 'expected string')
   assert(typeof uri === 'string', 'expected string')
@@ -171,29 +144,40 @@ MangerTransform.prototype._request = function (qry, cb) {
   var opts = qry.request()
   var mod = protocols[opts.protocol]
   var req = mod.get(opts, function (res) {
-    var h = processHeaders(qry, res)
-    var shouldAbort = !h.ok
-    if (h.er) {
-      var key = failureKey('GET', qry.url)
-      me.failures.set(key, h.er.message)
-      me.emit('error', h.er)
-      cb()
-    } else if (shouldAbort) {
-      res.req.abort()
-      var shouldRedirect = !!h.url
-      if (shouldRedirect) {
-        var er = new Error('redirecting')
-        me.emit('error', er)
-        this.redirects.set(qry.url, h.url)
-        qry.url = h.url
-        me.request(qry, cb)
-      } else {
-        me.retrieve(qry, cb)
-      }
-    } else {
+    var h = headary(res)
+    if (h.ok) {
       me.parse(qry, res, function (er) {
         cb(er)
       })
+    } else {
+      if (h.message) {
+        var er = new Error(h.message)
+        var key = failureKey('GET', qry.url)
+        me.failures.set(key, h.message)
+        me.emit('error', er)
+        cb()
+      } else {
+        res.req.abort()
+        if (h.url) {
+          me.redirects.set(qry.url, h.url)
+          var nq = qry.clone(h.url)
+          if (h.permanent) {
+            remove(me.db, qry.url, function (er) {
+              if (er && !er.notFound) me.emit('error', er)
+              me.request(nq, cb)
+            })
+          } else {
+            me.request(nq, cb)
+          }
+        } else if (h.permanent) {
+          remove(me.db, qry.url, function (er) {
+            if (er && !er.notFound) me.emit('error', er)
+            cb()
+          })
+        } else {
+          me.retrieve(qry, cb)
+        }
+      }
     }
   })
   req.once('error', function (er) {
@@ -228,22 +212,35 @@ MangerTransform.prototype.request = function (qry, cb) {
         me.emit('error', er)
         return me._request(qry, cb)
       }
-      var h = processHeaders(qry, res)
-      var shouldAbort = !h.ok
-      if (h.er) {
-        me.emit('error', h.er)
-        me._request(qry, cb)
-      } else if (shouldAbort) {
-        var shouldRedirect = !!h.url
-        if (shouldRedirect) {
-          qry.url = h.url
-          me.request(qry, cb)
-        } else {
-          // not our problem anymore
+      var h = headary(res)
+      if (h.ok) {
+        if (res.headers.etag === qry.etag) {
           cb()
+        } else {
+          me._request(qry, cb)
         }
       } else {
-        me._request(qry, cb)
+        if (h.message) {
+          er = new Error(h.message)
+          me._request(qry, cb)
+        } else if (h.url) {
+          var nq = qry.clone(h.url)
+          if (h.permanent) {
+            remove(me.db, qry.url, function (er) {
+              if (er && !er.notFound) me.emit('error', er)
+              me.request(nq, cb)
+            })
+          } else {
+            me.request(nq, cb)
+          }
+        } else if (h.permanent) {
+          remove(me.db, qry.url, function (er) {
+            if (er && !er.notFound) me.emit('error', er)
+            cb()
+          })
+        } else {
+          cb()
+        }
       }
     })
   } else {
@@ -266,11 +263,11 @@ MangerTransform.prototype._transform = function (qry, enc, cb) {
   if (!qry) {
     cb(new Error('invalid query'))
   } else {
-    this.emit('qry', qry)
+    this.emit('query', qry)
     var db = this.db
     var me = this
     var uri = qry.url
-    // ETag defines if something is cached.
+    // The ETag index is truth, it decides if something is cached.
     getETag(db, uri, function (er, etag) {
       if (er && !er.notFound) {
         me.emit('error', er)
@@ -457,29 +454,29 @@ function Entries (db, opts) {
 
 Entries.prototype.retrieve = function (qry, cb) {
   var me = this
-  var values = this.db.createValueStream({
-    gte: schema.entry(qry.url, qry.since),
-    lte: schema.entry(qry.url, Date.now()),
-    fillCache: true
-  })
-  function read () {
-    var ok
-    var yes
-    do {
-      var chunk
-      yes = (chunk = values.read()) !== null
-      if (yes) ok = me.use(chunk)
-    } while (yes && ok)
-    if (ok === false) me.once('drain', read)
+  var opts = schema.entries(qry.url, qry.since, true)
+  var values = this.db.createValueStream(opts)
+  var ok = true
+  function use () {
+    if (!ok) return
+    var chunk
+    while (ok && (chunk = values.read()) !== null) {
+      ok = me.use(chunk)
+    }
+    if (!ok) {
+      me.once('drain', function () {
+        ok = true
+        use()
+      })
+    }
   }
-  values.on('readable', read)
-  values.on('error', function (er) {
-    me.emit('error', er)
-  })
-  values.on('end', function () {
+  function onend (er) {
     values.removeAllListeners()
-    cb()
-  })
+    cb(er)
+  }
+  values.on('readable', use)
+  values.on('error', onend)
+  values.on('end', onend)
 }
 
 // Transform feed keys to URLs.
@@ -496,20 +493,21 @@ URLs.prototype._transform = function (chunk, enc, cb) {
   cb()
 }
 
-// TODO: Merge list and ranks into one
 function list (db, opts) {
   var keys = db.createKeyStream(schema.allFeeds)
-  var uris = new URLs({ encoding: 'utf8', objectMode: true })
+  var uris = new URLs({ objectMode: true })
+  var ok = true
   function write () {
-    var yes
-    var ok
-    do {
-      var chunk
-      yes = (chunk = keys.read()) !== null
-      if (yes) ok = uris.write(chunk)
-    } while (yes && ok)
-    if (ok === false) {
-      keys.once('drain', write)
+    if (!ok) return
+    var chunk
+    while ((chunk = keys.read()) !== null) {
+      ok = uris.write(chunk)
+    }
+    if (!ok) {
+      uris.once('drain', function () {
+        ok = true
+        write()
+      })
     }
   }
   keys.on('error', function (er) {
@@ -523,54 +521,59 @@ function list (db, opts) {
   return uris
 }
 
-// Requests updates for all feeds in ranked order (hot feeds first)
-// and returns a readable stream of feeds that have been updated.
-function update (db, opts) {
-  var ranked = ranks(db, opts)
-  var all = list(db, opts)
+// Transform feeds to URLs.
+function FeedURLs (opts) {
+  if (!(this instanceof FeedURLs)) return new FeedURLs(opts)
+  stream.Transform.call(this, opts)
+}
+util.inherits(FeedURLs, stream.Transform)
+FeedURLs.prototype._transform = function (chunk, enc, cb) {
+  var uri = chunk.feed
+  if (uri) {
+    this.push(uri)
+  } else {
+    this.emit('error', new Error('feed without URL'))
+  }
+  cb()
+}
 
+// Requests updates for all feeds in ranked order (hot feeds first)
+// and returns a readable stream of URLs of the updated feeds.
+function update (db, opts, x) {
   var copy = extend(Object.create(null), opts)
   copy.force = true
-  var feeds = new Feeds(db, copy)
-
-  var merged = Object.create(null)
-  var decoder = new string_decoder.StringDecoder()
-
-  function merge (s) {
-    s.on('error', function (er) {
-      feeds.emit('error', er)
-    })
-    s.on('end', function () {
-      s.removeAllListeners()
-      if (s === all) {
-        feeds.end()
-      } else {
-        merge(all)
-      }
-    })
-    var ok = true
-    function write () {
-      if (!ok) return
-      var chunk
-      while ((chunk = s.read()) !== null) {
-        var k = decoder.write(chunk)
-        if (!(k in merged)) {
-          ok = feeds.write(chunk)
-          merged[k] = true
-        }
-      }
-      if (!ok) {
-        s.once('drain', function () {
-          ok = true
-          write()
-        })
-      }
-    }
-    s.on('readable', write)
+  copy.objectMode = true
+  function create () {
+    return new Feeds(db, copy)
   }
-  merge(ranked)
-
-  return feeds
+  var r = ranks(db, opts)
+  var s = speculum({ objectMode: true }, r, create, x)
+  var uris = new FeedURLs({ objectMode: true })
+  var ok = true
+  function write () {
+    if (!ok) return
+    var feed
+    while (ok && (feed = s.read()) !== null) {
+      ok = uris.write(feed)
+    }
+    if (!ok) {
+      uris.once('drain', function () {
+        ok = true
+        write()
+      })
+    }
+  }
+  function onend () {
+    s.removeAllListeners()
+    uris.end()
+  }
+  function onerror (er) {
+    uris.emit('error', er)
+  }
+  s.on('readable', write)
+  s.on('error', onerror)
+  s.on('end', onend)
+  return uris
 }
 
 function getFeed (db, uri, cb) {
@@ -595,12 +598,51 @@ function newer (item, qry) {
   return b === 0 || a > b
 }
 
+function has (db, uri, cb) {
+  getETag(db, uri, function (er, etag) {
+    cb(er)
+  })
+}
+
+function remove (db, uri, cb) {
+  has(db, uri, function (er) {
+    if (er) return cb(er)
+    var ops = [
+      new Delete(schema.etag(uri)),
+      new Delete(schema.feed(uri))
+    ]
+    var opts = schema.entries(uri, Infinity)
+    var keys = db.createKeyStream(opts)
+    keys.on('error', function (er) {
+      keys.removeAllListeners()
+      cb(er)
+    })
+    keys.on('data', function (chunk) {
+      ops.push(new Delete(chunk))
+    })
+    keys.on('end', function () {
+      keys.removeAllListeners()
+      db.batch(ops, function (er) {
+        cb(er)
+      })
+    })
+  })
+}
+
+function flushCounter (db, counter, cb) {
+  cb = cb || nop
+  rank(db, counter, function (er, count) {
+    if (!er) counter.reset()
+    if (cb) cb(er, count)
+  })
+}
+
 // Transforms rank keys to URLs.
 util.inherits(Ranks, stream.Transform)
 function Ranks (opts) {
   if (!(this instanceof Ranks)) return new Ranks(opts)
   stream.Transform.call(this, opts)
-  this._readableState.objectMode = opts.readableObjectMode
+  this._readableState.objectMode = opts.objectMode
 }
 
 Ranks.prototype._transform = function (chunk, enc, cb) {
@@ -626,14 +668,6 @@ function Manger (name, opts) {
   this.db = levelup(name, {
     keyEncoding: bytewise,
     cacheSize: this.opts.cacheSize
-  })
-}
-
-Manger.prototype.flushCounter = function (cb) {
-  var counter = this.counter
-  rank(this.db, counter, function (er) {
-    if (!er) counter.reset()
-    if (cb) cb(er)
   })
 }
 
@@ -715,30 +749,42 @@ Manger.prototype.feeds = function () {
 Manger.prototype.entries = function () {
   var s = new Entries(this.db, this.opts)
   var counter = this.counter
-  function onqry (qry) {
+  function onquery (qry) {
     var k = qry.url
     var c = counter.peek(k) || 0
     counter.set(k, ++c)
   }
-  s.on('qry', onqry)
+  s.on('query', onquery)
   s.once('finish', function () {
-    s.removeListener('qry', onqry)
+    s.removeListener('query', onquery)
   })
   return s
 }
 
-Manger.prototype.update = function () {
-  return update(this.db, this.opts)
+Manger.prototype.flushCounter = function (cb) {
+  return flushCounter(this.db, this.counter, cb)
+}
+
+// -x Number of concurrent streams to use
+Manger.prototype.update = function (x) {
+  return update(this.db, this.opts, x)
 }
 
 Manger.prototype.list = function () {
   return list(this.db, this.opts)
 }
 
+Manger.prototype.has = function (uri, cb) {
+  return has(this.db, uri, cb)
+}
+
+Manger.prototype.remove = function (uri, cb) {
+  return remove(this.db, uri, cb)
+}
+
 if (parseInt(process.env.NODE_TEST, 10) === 1) {
   exports.Entries = Entries
   exports.Feeds = Feeds
-  exports.Headers = Headers
   exports.Manger = Manger
   exports.URLs = URLs
   exports.failureKey = failureKey
@@ -746,7 +792,6 @@ if (parseInt(process.env.NODE_TEST, 10) === 1) {
   exports.getFeed = getFeed
   exports.list = list
   exports.newer = newer
-  exports.processHeaders = processHeaders
   exports.processQuery = processQuery
   exports.ranks = ranks
   exports.redirect = redirect

@@ -36,20 +36,21 @@ test('not modified', function (t) {
   var input = fs.createReadStream(p)
   function update () {
     var updated = store.update()
-    var chunks = ''
-    updated.on('data', function (chunk) {
-      chunks += chunk
+    updated.on('error', function (er) {
+      throw er
     })
     updated.on('end', function () {
-      t.same(JSON.parse(chunks), [])
+      t.pass('should end update')
       scopes.forEach(function (scope) {
-        t.ok(scope.isDone())
+        t.ok(scope.isDone(), 'should exhaust scope')
       })
     })
+    updated.resume()
   }
   feeds.on('finish', function () {
     store.flushCounter(function (er) {
-      t.is(er, undefined)
+      if (er) throw er
+      t.pass('should flush counter')
       update()
     })
   })

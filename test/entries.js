@@ -28,8 +28,8 @@ test('all', function (t) {
   }
   function go (times) {
     if (times === 0) return
-    var db = common.freshDB()
-    var entries = new manger.Entries(db)
+    var cache = common.freshManger()
+    var entries = cache.entries()
     var chunks = ''
     entries.on('error', function (er) {
       t.fail('should not ' + er)
@@ -38,11 +38,10 @@ test('all', function (t) {
       chunks += chunk
     })
     entries.once('end', function () {
-      t.doesNotThrow(function () {
-        var found = JSON.parse(chunks)
-        t.is(found.length, 150 * 2)
-        go(--times)
-      })
+      var found = JSON.parse(chunks)
+      t.is(found.length, 150 * 2)
+      t.is(cache.counter.itemCount, 1)
+      go(--times)
     })
     var uri = 'http://just/b2w'
     t.ok(entries.write(uri))
@@ -68,7 +67,6 @@ test('time range', function (t) {
     }, headers))
   })
   var db = common.freshDB()
-
   var entries = new manger.Entries(db)
   var chunks = ''
   entries.on('error', function (er) {

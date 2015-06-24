@@ -42,6 +42,33 @@ test('entry', function (t) {
   is(found, wanted, t).end()
 })
 
+test('entries', function (t) {
+  var f = schema.entries
+  var wanted = [
+    { gte: ['manger', ['entry', 'http://abc.de/', 0]],
+      lte: ['manger', ['entry', 'http://abc.de/', Infinity]],
+      fillCache: false
+    },
+    { gte: ['manger', ['entry', 'http://abc.de/', 3600]],
+      lte: ['manger', ['entry', 'http://abc.de/', Infinity]],
+      fillCache: true
+    }
+  ]
+  var found = [
+    f('http://abc.de'),
+    f('http://abc.de', 3600, true)
+  ]
+  t.plan(wanted.length)
+  found.forEach(function (it) {
+    var d = {
+      gte: bytewise.decode(it.gte),
+      lte: bytewise.decode(it.lte),
+      fillCache: it.fillCache
+    }
+    t.same(d, wanted.shift())
+  })
+})
+
 test('etag', function (t) {
   var f = schema.etag
   var wanted = [

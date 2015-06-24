@@ -52,33 +52,6 @@ test('compare etags', function (t) {
   })
 })
 
-test('headers in rough strokes', function (t) {
-  var f = manger.processHeaders
-  var H = manger.Headers
-  function error (sc) {
-    var er = new Error('unhandled HTTP status code ' + sc)
-    return er
-  }
-  var wanted = [
-    new H(error(100), false),
-    new H(undefined, true),
-    new H(undefined, false),
-    new H(error(400), false),
-    new H(error(500), false)
-  ]
-  var found = [
-    f({}, { headers: {}, statusCode: 100 }),
-    f({}, { headers: {}, statusCode: 200 }),
-    f({}, { headers: {}, statusCode: 300 }),
-    f({}, { headers: {}, statusCode: 400 }),
-    f({}, { headers: {}, statusCode: 500 })
-  ]
-  t.plan(wanted.length)
-  wanted.forEach(function (it) {
-    t.deepEqual(found.shift(), it)
-  })
-})
-
 test('process query', function (t) {
   var f = manger.processQuery
   var wanted = [
