@@ -26,6 +26,7 @@ test('ETag', { skip: false }, function (t) {
       if (mock.f === scope.head) {
         var wanted = {
           'if-none-match': '55346232-18151',
+          'accept-encoding': 'gzip',
           host: 'feeds.5by5.tv'
         }
         var found = this.req.headers

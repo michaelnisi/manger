@@ -49,7 +49,8 @@ test('request', function (t) {
       method: 'GET',
       protocol: 'http:',
       headers: {
-        'If-None-Match': '123'
+        'if-none-match': '123',
+        'accept-encoding': 'gzip'
       }
     },
     { hostname: 'abc.def',

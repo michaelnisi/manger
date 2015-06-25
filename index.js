@@ -538,7 +538,9 @@ FeedURLs.prototype._transform = function (chunk, enc, cb) {
 }
 
 // Requests updates for all feeds in ranked order (hot feeds first)
-// and returns a readable stream of URLs of the updated feeds.
+// and returns a readable stream of URLs of the updated feeds. Note
+// that `flushCounter` has to be applied first, before update has any
+// effect.
 function update (db, opts, x) {
   var copy = extend(Object.create(null), opts)
   copy.force = true
