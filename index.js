@@ -94,7 +94,7 @@ MangerTransform.prototype._flush = function (cb) {
 // The data we try to parse comes from within our own system, should
 // it be corrupt and thus JSON failing to parse it, we better crash.
 var CHARS = ['[', ',']
-MangerTransform.prototype.use = function (chunk) {
+MangerTransform.prototype.use = function (chunk) { // HOT
   var it
   var obj = typeof chunk === 'object'
   if (this._readableState.objectMode) {
@@ -474,7 +474,8 @@ Entries.prototype.retrieve = function (qry, cb) {
     cb(error)
   }
   var ok = true
-  function use () {
+
+  function use () { // HOT
     if (!ok || done === nop) return
     var chunk
     while (ok && (chunk = values.read()) !== null) {

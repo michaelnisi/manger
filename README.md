@@ -118,7 +118,7 @@ A [Readable](http://nodejs.org/api/stream.html#stream_class_stream_readable_1) s
 
 - `x` `Number() | 5` The number of streams to engage concurrently
 
-Updates all ranked feeds and returns a stream that emits feed URLs of updated feeds. This, of course, could produce a resource heavy operation! Feeds are updated ordered by their popularity, using the rank index, therefore `flushCount` has to be invoked before this method can take any effect.
+Updates all ranked feeds and returns a stream that emits feed URLs of updated feeds. This, of course, could produce a resource heavy operation! Feeds are updated ordered by their popularity, using the rank index, therefore `flushCount` must have been invoked before this method can take any effect.
 
 - `read()` `str()`
 
