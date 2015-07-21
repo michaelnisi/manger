@@ -1,6 +1,6 @@
 {
   "name": "manger",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "cache feeds",
   "main": "index.js",
   "scripts": {
@@ -30,7 +30,7 @@
   "dependencies": {
     "bytewise": "^1.0.0",
     "headary": "^1.0.0",
-    "leveldown": "^1.0.6",
+    "leveldown": "1.2.x",
     "levelup": "^1.0.0",
     "lru-cache": "^2.6.2",
     "pickup": "^3.0.0",

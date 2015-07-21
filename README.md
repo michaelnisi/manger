@@ -6,11 +6,15 @@ The **manger** [Node](http://nodejs.org/) package caches RSS and Atom formatted 
 
 ## Types
 
+### void()
+
+`null | undefined`
+
 ### str()
 
 An optional [`String()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String).
 
-`String() | null | undefined`
+`String() | void()`
 
 ### feed()
 
@@ -43,7 +47,7 @@ A related resource of an `entry()`.
 An individual entry.
 
 - `author` `str()`
-- `enclosure enclosure() | null | undefined`
+- `enclosure enclosure() | void()`
 - `duration` `str()`
 - `feed` `str()`
 - `id` `str()`
@@ -59,8 +63,8 @@ An individual entry.
 A query to get a feed or entries of a feed in a time range between `Date.now()` and `since`.
 
 - `url` `String()`
-- `since` [`Date()`](https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Global_Objects/Date) `| null | undefined`
-- `etag` `String() | null | undefined` An [entity tag](http://en.wikipedia.org/wiki/HTTP_ETag)
+- `since` [`Date()`](https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Global_Objects/Date) `| void()`
+- `etag` `String() | void()` An [entity tag](http://en.wikipedia.org/wiki/HTTP_ETag)
 - `force` [`Boolean()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Boolean)` | false` Force update ignoring cache
 
 ### opts()
@@ -68,7 +72,7 @@ A query to get a feed or entries of a feed in a time range between `Date.now()` 
 Options for a `Manger` instance.
 
 - `cacheSize` [`Number()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number) `| 8 * 1024 * 1024` Passed to [levelup()](https://github.com/Level/levelup#ctor)
-- `objectMode` `Boolean() | false`
+- `objectMode` `Boolean() | false` Return objects instead of buffers
 
 ## Exports
 
@@ -84,18 +88,18 @@ var manger = require('manger')
 var cache = manger('/tmp/manger.db')
 ```
 
-If options has `objectMode` set to `true`, results are read as `Object` types, otherwise they are [`Buffer`](https://nodejs.org/api/buffer.html) or `String` moulding valid [JSON](http://json.org/), depending of which stream of the API is used.
+If `opts` has `objectMode` set to `true`, results are read as `Object` types, instead of [`Buffer`](https://nodejs.org/api/buffer.html) moulding valid [JSON](http://json.org/).
 
-**manger** leverages the lexicographical key sort order of [LevelDB](http://leveldb.org/). The keys are designed to stream feeds or entries in time ranges between now and some point in the past.
+**manger** leverages the lexicographical key sort order of [LevelDB](http://leveldb.org/). The keys are designed to stream feeds or entries in time ranges between now and some user defined point in the past.
 
-The distinction between feed and entries may not be clear. A feed models the metadata of an RSS or Atom feed (title, author, published, etc.), while entries are the actual items in the feed. These are detached to not repeatedly transmit feed metadata—after all **manger** tries to save round-trips.
+The distinction between feed and entries might be unclear. A feed models the metadata of an RSS or Atom feed (title, author, published, etc.), while entries are the actual items in the feed. These are detached to not repeatedly transmit feed metadata—after all **manger** tries to save round-trips.
 
 ### cache.entries()
 
 A [Transform](http://nodejs.org/api/stream.html#stream_class_stream_transform) stream that transforms queries or URLs to entries.
 
 - `write(Buffer() | String() | query())`
-- `read()` `Buffer() | String() | entry()`
+- `read()` `Buffer() | entry()`
 
 ### cache.feeds()
 
@@ -114,7 +118,7 @@ A [Readable](http://nodejs.org/api/stream.html#stream_class_stream_readable_1) s
 
 - `x` `Number() | 5` The number of streams to engage concurrently
 
-Updates all ranked feeds and returns a stream that emits feed URL strings of updated feeds. This, of course, might be a resource heavy operation! Feeds are updated ordered by their popularity, using the rank index, therefore `flushCount` has to be invoked before this method can take any effect.
+Updates all ranked feeds and returns a stream that emits feed URLs of updated feeds. This, of course, could produce a resource heavy operation! Feeds are updated ordered by their popularity, using the rank index, therefore `flushCount` has to be invoked before this method can take any effect.
 
 - `read()` `str()`
 
@@ -124,14 +128,17 @@ A stream of URLs sorted by rank (highest first).
 
 - `read()` `Buffer() | String() | null`
 
-### cache.resetRanks()
+### cache.resetRanks(cb)
 
 Resets the ranks index.
 
+- `cb` [`Function`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function)`(error)` The callback
+  - `error` [`Error()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error) `| void()` The possible error
+
 ### cache.flushCounter(cb)
 
-- `cb` `Function(error, count) | null | undefined` The callback
-  - `error` [`Error()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error) `| null | undefined` The possible error
+- `cb` `Function(error, count) | void()` The callback
+  - `error` `Error() | void()` The possible error
   - `count` `Number()` Total number of cached feeds
 
 **manger** keeps an in-memory count of how many times feeds have been accessed. This function flushes the counter to disk, updating the ranks index.
@@ -141,16 +148,16 @@ Resets the ranks index.
 Applies callback `cb` without arguments if a feed with this `url` is cached.
 
 - `url` `String()` The URL of the feed
-- `cb` [`Function`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function)`(error)` The callback
-  - `error` `Error() | null | undefined` The possible error
+- `cb` `Function(error) | void()` The callback
+  - `error` `Error() | void()` The possible error
 
 ### cache.remove(url, cb)
 
 Attempts to remove a feed matching the `url` from the cache and applies callback without `error` if this succeeds.
 
 - `url` `String()` The URL of the feed
-- `cb` `Function(error) | null | undefined` The callback
-  - `error` `Error() | null | undefined` The possible error
+- `cb` `Function(error) | void()` The callback
+  - `error` `Error() | void()` The possible error
 
 ## Additional exports
 
@@ -158,7 +165,7 @@ The **manger** module decorates the exported `Manger` constructor with two conve
 
 ### manger.query(url, since, etag, force)
 
-A failable factory function returning a valid [`query()`](#query) or `null | undefined`.
+A failable factory function returning a valid [`query()`](#query) or `void()`.
 
 ### manger.queries()
 

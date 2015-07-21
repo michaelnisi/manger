@@ -45,11 +45,11 @@ test('entry', function (t) {
 test('entries', function (t) {
   var f = schema.entries
   var wanted = [
-    { gte: ['manger', ['entry', 'http://abc.de/', 0]],
+    { gt: ['manger', ['entry', 'http://abc.de/', 0]],
       lte: ['manger', ['entry', 'http://abc.de/', Infinity]],
       fillCache: false
     },
-    { gte: ['manger', ['entry', 'http://abc.de/', 3600]],
+    { gt: ['manger', ['entry', 'http://abc.de/', 3600]],
       lte: ['manger', ['entry', 'http://abc.de/', Infinity]],
       fillCache: true
     }
@@ -61,7 +61,7 @@ test('entries', function (t) {
   t.plan(wanted.length)
   found.forEach(function (it) {
     var d = {
-      gte: bytewise.decode(it.gte),
+      gt: bytewise.decode(it.gt),
       lte: bytewise.decode(it.lte),
       fillCache: it.fillCache
     }

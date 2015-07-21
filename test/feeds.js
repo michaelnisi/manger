@@ -1,7 +1,9 @@
+var assert = require('assert')
 var common = require('./lib/common')
 var fs = require('fs')
 var nock = require('nock')
 var path = require('path')
+var stream = require('readable-stream')
 var test = require('tap').test
 
 test('a single plain query', function (t) {
@@ -15,9 +17,12 @@ test('a single plain query', function (t) {
     var p = path.join(__dirname, 'data', 'b2w.xml')
     return fs.createReadStream(p)
   }, headers)
+
   var cache = common.freshManger()
   var feeds = cache.feeds()
+  assert(feeds instanceof stream.Readable, 'should be Readable')
   var chunks = ''
+
   feeds.on('data', function (chunk) { chunks += chunk })
   feeds.on('end', function () {
     var p = path.join(__dirname, 'data', 'b2w.json')

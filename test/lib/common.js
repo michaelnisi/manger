@@ -10,7 +10,7 @@ var rimraf = require('rimraf')
 var levelup = require('levelup')
 
 function freshName () {
-  return '/tmp/fanboy-' + Math.floor(Math.random() * (1 << 24))
+  return '/tmp/manger-' + Math.floor(Math.random() * (1 << 24))
 }
 
 var db

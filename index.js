@@ -22,6 +22,11 @@ var speculum = require('speculum')
 var util = require('util')
 var zlib = require('zlib')
 
+exports.Entries = Entries
+exports.Feeds = Feeds
+exports.Manger = Manger
+exports.MangerTransform = MangerTransform
+
 exports.query = query
 exports.queries = function (opts) {
   return new query.Queries(opts)
@@ -55,7 +60,6 @@ function extend (origin, add) {
   return util._extend(origin, add)
 }
 
-util.inherits(MangerTransform, stream.Transform)
 function MangerTransform (db, opts) {
   if (!(this instanceof MangerTransform)) {
     return new MangerTransform(db, opts)
@@ -77,6 +81,7 @@ function MangerTransform (db, opts) {
   this.decoder = new string_decoder.StringDecoder()
   this.state = 0
 }
+util.inherits(MangerTransform, stream.Transform)
 
 MangerTransform.prototype._flush = function (cb) {
   if (!this._readableState.objectMode) {
@@ -183,7 +188,8 @@ MangerTransform.prototype._request = function (qry, cb) {
   req.once('error', function (er) {
     var key = failureKey('GET', qry.url)
     me.failures.set(key, er.message)
-    me.emit('error', er)
+    var error = new Error('request error: ' + er.message)
+    me.emit('error', error)
     cb()
   })
 }
@@ -383,7 +389,8 @@ MangerTransform.prototype.parse = function (qry, res, cb) {
       }
     }
     function onerror (er) {
-      me.emit('error', er)
+      var error = new Error('parse error: ' + er.message)
+      me.emit('error', error)
       var key = failureKey('GET', uri)
       me.failures.set(key, er.message)
       reader.removeAllListeners()
@@ -456,9 +463,19 @@ Entries.prototype.retrieve = function (qry, cb) {
   var me = this
   var opts = schema.entries(qry.url, qry.since, true)
   var values = this.db.createValueStream(opts)
+  var done = onend
+  function onend (er) {
+    done = nop
+    var error
+    if (er) {
+      error = new Error('retrieve error: ' + er.message)
+    }
+    values.removeAllListeners()
+    cb(error)
+  }
   var ok = true
   function use () {
-    if (!ok) return
+    if (!ok || done === nop) return
     var chunk
     while (ok && (chunk = values.read()) !== null) {
       ok = me.use(chunk)
@@ -470,13 +487,9 @@ Entries.prototype.retrieve = function (qry, cb) {
       })
     }
   }
-  function onend (er) {
-    values.removeAllListeners()
-    cb(er)
-  }
   values.on('readable', use)
-  values.on('error', onend)
-  values.on('end', onend)
+  values.on('error', done)
+  values.on('end', done)
 }
 
 // Transform feed keys to URLs.
@@ -510,13 +523,16 @@ function list (db, opts) {
       })
     }
   }
-  keys.on('error', function (er) {
-    uris.emit('error', er)
-  })
-  keys.on('end', function () {
+  function onerror (er) {
+    var error = new Error('list error: ' + er.message)
+    uris.emit('error', error)
+  }
+  function onend () {
     keys.removeAllListeners()
     uris.end()
-  })
+  }
+  keys.on('error', onerror)
+  keys.on('end', onend)
   keys.on('readable', write)
   return uris
 }
@@ -570,7 +586,8 @@ function update (db, opts, x) {
     uris.end()
   }
   function onerror (er) {
-    uris.emit('error', er)
+    var error = new Error('update error: ' + er.message)
+    uris.emit('error', error)
   }
   s.on('readable', write)
   s.on('error', onerror)
@@ -756,10 +773,11 @@ Manger.prototype.entries = function () {
     var c = counter.peek(k) || 0
     counter.set(k, ++c)
   }
-  s.on('query', onquery)
-  s.once('finish', function () {
+  function onfinish () {
     s.removeListener('query', onquery)
-  })
+  }
+  s.on('query', onquery)
+  s.once('finish', onfinish)
   return s
 }
 
@@ -789,6 +807,7 @@ if (parseInt(process.env.NODE_TEST, 10) === 1) {
   exports.Feeds = Feeds
   exports.Manger = Manger
   exports.URLs = URLs
+  exports.debug = debug
   exports.failureKey = failureKey
   exports.getETag = getETag
   exports.getFeed = getFeed
