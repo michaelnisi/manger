@@ -72,7 +72,7 @@ A query to get a feed or entries of a feed in a time range between `Date.now()` 
 Options for a `Manger` instance.
 
 - `cacheSize` [`Number()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number) `| 8 * 1024 * 1024` Passed to [levelup()](https://github.com/Level/levelup#ctor)
-- `objectMode` `Boolean() | false` Return objects instead of buffers
+- `objectMode` `Boolean() | false` Provide objects instead of buffers
 
 ## Exports
 

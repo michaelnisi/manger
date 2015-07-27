@@ -18,7 +18,6 @@ var rank = require('./lib/rank')
 var schema = require('./lib/schema')
 var stream = require('readable-stream')
 var string_decoder = require('string_decoder')
-var speculum = require('speculum')
 var util = require('util')
 var zlib = require('zlib')
 
@@ -34,12 +33,10 @@ exports.queries = function (opts) {
 
 function nop () {}
 
-var debug = (function () {
-  return parseInt(process.env.NODE_DEBUG, 10) === 1 ?
-    function (o) {
-      console.error('** manger: %s', util.inspect(o))
-    } : nop
-}())
+var debug = function (o) {
+  console.error('** manger: %s', util.inspect(o))
+}
+if (parseInt(process.env.NODE_DEBUG, 10) !== 1) debug = nop
 
 function Opts (opts) {
   opts = opts || Object.create(null)
@@ -66,9 +63,7 @@ function MangerTransform (db, opts) {
   }
   opts = defaults(opts)
 
-  var sopts = Object.create(null)
-  sopts.highWaterMark = opts.highWaterMark
-  stream.Transform.call(this, db, sopts)
+  stream.Transform.call(this, db, { highWaterMark: opts.highWaterMark })
 
   this.counterMax = opts.counterMax
   this.failures = opts.failures
@@ -88,19 +83,23 @@ MangerTransform.prototype._flush = function (cb) {
     var chunk = this.state === 0 ? '[]' : ']'
     this.push(chunk)
   }
+  this.failures = null
+  this.redirects = null
+  this.db = null
+  this.decoder = null
   cb()
 }
 
 // The data we try to parse comes from within our own system, should
 // it be corrupt and thus JSON failing to parse it, we better crash.
-var CHARS = ['[', ',']
 MangerTransform.prototype.use = function (chunk) { // HOT
   var it
   var obj = typeof chunk === 'object'
   if (this._readableState.objectMode) {
     it = obj ? chunk : JSON.parse(chunk)
   } else {
-    it = CHARS[this.state] + (obj ? JSON.stringify(chunk) : chunk)
+    var chars = ['[', ',']
+    it = chars[this.state] + (obj ? JSON.stringify(chunk) : chunk)
     if (this.state === 0) this.state = 1
   }
   return this.push(it)
@@ -116,23 +115,33 @@ function redirect (sc) {
   return sc >= 300 && sc < 400
 }
 
-var protocols = { 'http:': http, 'https:': https }
+function protocol (name) {
+  return { 'http:': http, 'https:': https }[name]
+}
 
 MangerTransform.prototype.head = function (qry, cb) {
   var opts = qry.request('HEAD')
-  var mod = protocols[opts.protocol]
-  var req = mod.request(opts, function (res) {
+  var mod = protocol([opts.protocol])
+  var me = this
+  var error
+  var req = mod.request(opts, function headcb (res) {
+    function onend () {
+      req.removeListener('error', onerror)
+      res.removeListener('end', onend)
+      cb(error, res)
+      cb = null
+      error = null
+      me = null
+    }
+    res.on('end', onend)
     res.resume()
-    cb(null, res)
-    cb = nop
   })
-  var failures = this.failures
-  req.once('error', function (er) {
+  function onerror (er) {
     var key = failureKey('HEAD', qry.url)
-    failures.set(key, er.message)
-    er.query = qry
-    cb(er)
-  })
+    me.failures.set(key, er.message)
+    error = new Error(er.message)
+  }
+  req.on('error', onerror)
   req.end()
 }
 
@@ -145,14 +154,17 @@ function failureKey (method, uri) {
 }
 
 MangerTransform.prototype._request = function (qry, cb) {
-  var me = this
   var opts = qry.request()
-  var mod = protocols[opts.protocol]
+  var mod = protocol([opts.protocol])
+
+  var me = this
   var req = mod.get(opts, function (res) {
     var h = headary(res)
     if (h.ok) {
       me.parse(qry, res, function (er) {
         cb(er)
+        cb = null
+        me = null
       })
     } else {
       if (h.message) {
@@ -161,6 +173,8 @@ MangerTransform.prototype._request = function (qry, cb) {
         me.failures.set(key, h.message)
         me.emit('error', er)
         cb()
+        cb = null
+        me = null
       } else {
         res.req.abort()
         if (h.url) {
@@ -170,17 +184,27 @@ MangerTransform.prototype._request = function (qry, cb) {
             remove(me.db, qry.url, function (er) {
               if (er && !er.notFound) me.emit('error', er)
               me.request(nq, cb)
+              nq = null
+              cb = null
             })
           } else {
             me.request(nq, cb)
+            nq = null
+            me = null
+            cb = null
           }
         } else if (h.permanent) {
           remove(me.db, qry.url, function (er) {
             if (er && !er.notFound) me.emit('error', er)
             cb()
+            cb = null
+            me = null
           })
         } else {
           me.retrieve(qry, cb)
+          me = null
+          qry = null
+          cb = null
         }
       }
     }
@@ -191,13 +215,13 @@ MangerTransform.prototype._request = function (qry, cb) {
     var error = new Error('request error: ' + er.message)
     me.emit('error', error)
     cb()
+    cb = null
+    me = null
   })
 }
 
-var NO_ETAG = 'NO_ETAG'
-
 function shouldRequestHead (qry) {
-  return !!qry.etag && qry.etag !== NO_ETAG
+  return !!qry.etag && qry.etag !== 'NO_ETAG'
 }
 
 MangerTransform.prototype.ignore = function (method, uri) {
@@ -216,15 +240,22 @@ MangerTransform.prototype.request = function (qry, cb) {
     this.head(qry, function (er, res) {
       if (er) {
         me.emit('error', er)
-        return me._request(qry, cb)
+        me._request(qry, cb)
+        me = null
+        cb = null
+        qry = null
+        return
       }
       var h = headary(res)
       if (h.ok) {
         if (res.headers.etag === qry.etag) {
           cb()
+          cb = null
         } else {
           me._request(qry, cb)
         }
+        me = null
+        qry = null
       } else {
         if (h.message) {
           er = new Error(h.message)
@@ -239,18 +270,28 @@ MangerTransform.prototype.request = function (qry, cb) {
           } else {
             me.request(nq, cb)
           }
+          me = null
+          qry = null
         } else if (h.permanent) {
           remove(me.db, qry.url, function (er) {
             if (er && !er.notFound) me.emit('error', er)
             cb()
+            cb = null
           })
+          me = null
+          qry = null
         } else {
+          me = null
+          qry = null
           cb()
+          cb = null
         }
       }
     })
   } else {
     this._request(qry, cb)
+    qry = null
+    cb = null
   }
 }
 
@@ -269,21 +310,27 @@ MangerTransform.prototype._transform = function (qry, enc, cb) {
   if (!qry) {
     cb(new Error('invalid query'))
   } else {
-    this.emit('query', qry)
     var db = this.db
     var me = this
     var uri = qry.url
-    // The ETag index is truth, it decides if something is cached.
+    // The ETag index is truth, it defines if something is cached.
     getETag(db, uri, function (er, etag) {
       if (er && !er.notFound) {
         me.emit('error', er)
       }
       qry.etag = etag
       if (!qry.force && qry.etag) {
+        // To make sure only valid feeds get counted, we emit 'query'
+        // events for cached feeds only.
+        me.emit('query', qry)
         me.retrieve(qry, cb)
       } else {
         me.request(qry, cb)
       }
+      cb = null
+      db = null
+      me = null
+      qry = null
     })
   }
 }
@@ -292,21 +339,39 @@ MangerTransform.prototype.uid = function (uri) {
   return [this.db.location, uri].join('~')
 }
 
-var PICKUP_OPTS = { eventMode: true }
-
 function Put (key, value) {
   this.key = key
   this.value = value
   this.type = 'put'
 }
 
+function ended (writer) {
+  var state = writer._writableState
+  return state.ended || state.ending || state.finished
+}
+
 MangerTransform.prototype.parse = function (qry, res, cb) {
   var me = this
-  var parser = pickup(PICKUP_OPTS)
+  var parser = pickup({ eventMode: true })
   var uri = qry.url
   var ops = []
   var rest = []
   var ok = true
+  var count = 0
+  function done (er) {
+    assert(++count === 1)
+    me = null
+    parser.removeListener('entry', onentry)
+    parser.removeListener('feed', onfeed)
+    parser = null
+    uri = null
+    ops = null
+    rest = null
+    qry = null
+    res = null
+    cb(er)
+    cb = null
+  }
   function onfeed (feed) {
     feed.feed = uri
     feed.updated = time(feed)
@@ -350,33 +415,10 @@ MangerTransform.prototype.parse = function (qry, res, cb) {
       cb()
     }
   }
-  function onfinish () {
-    dispose(function (er) {
-      var tag = res.headers['etag'] || NO_ETAG
-      var key = schema.etag(uri)
-      var op = new Put(key, tag)
-      ops.push(op)
-      me.db.batch(ops, function (er) {
-        if (er) me.emit('error', er)
-        parser.removeAllListeners()
-        cb()
-      })
-    })
-  }
-  parser.on('entry', onentry)
-  parser.once('feed', onfeed)
-  parser.once('finish', onfinish)
-
-  var unzip
-  if (res.headers['content-encoding'] === 'gzip') {
-    unzip = zlib.createGunzip()
-  }
   function drive (reader, writer) {
     var ok = true
     function write () {
-      var state = writer._writableState
-      var ended = state.ended || state.ending || state.finished
-      if (ended || !ok) return
+      if (ended(writer) || !ok) return
       var chunk
       while ((chunk = reader.read()) !== null) {
         ok = writer.write(chunk)
@@ -388,25 +430,54 @@ MangerTransform.prototype.parse = function (qry, res, cb) {
         })
       }
     }
+    function onend () {
+      reader.removeListener('readable', write)
+      reader.removeListener('end', onend)
+      reader.removeListener('error', onerror)
+      reader = null
+      if (!ended(writer)) writer.end()
+    }
     function onerror (er) {
+      if (!me) return
       var error = new Error('parse error: ' + er.message)
       me.emit('error', error)
       var key = failureKey('GET', uri)
       me.failures.set(key, er.message)
-      reader.removeAllListeners()
-      writer.removeAllListeners()
-      writer.end()
-      cb()
+      onend()
+      done()
+    }
+    function onfinish () {
+      if (writer) {
+        writer.removeListener('error', onerror)
+        writer.removeListener('finish', onfinish)
+      }
+      if (!me) return
+      var isParser = writer === parser
+      writer = null
+      if (isParser) {
+        dispose(function (er) {
+          var tag = res.headers['etag'] || 'NO_ETAG'
+          var key = schema.etag(uri)
+          var op = new Put(key, tag)
+          ops.push(op)
+          me.db.batch(ops, function (er) {
+            if (er) me.emit('error', er)
+            done()
+          })
+        })
+      }
     }
     reader.on('readable', write)
-    reader.once('error', onerror)
-    reader.once('end', function () {
-      reader.removeListener('readable', write)
-      writer.end()
-    })
-    writer.once('error', onerror)
+    reader.on('end', onend)
+    reader.on('error', onerror)
+    writer.on('error', onerror)
+    writer.on('finish', onfinish)
   }
-  if (unzip) {
+  parser.on('entry', onentry)
+  parser.once('feed', onfeed)
+
+  if (res.headers['content-encoding'] === 'gzip') {
+    var unzip = zlib.createGunzip()
     drive(res, unzip)
     drive(unzip, parser)
   } else {
@@ -414,25 +485,14 @@ MangerTransform.prototype.parse = function (qry, res, cb) {
   }
 }
 
-util.inherits(OptGunzip, stream.Transform)
-function OptGunzip (opts) {
-  if (!(this instanceof OptGunzip)) return new OptGunzip(opts)
-  stream.Transform.call(this, opts)
-}
-
-OptGunzip.prototype._transform = function (chunk, enc, cb) {
-  this.push(chunk)
-  cb()
-}
-
 // A stream of feeds.
-util.inherits(Feeds, MangerTransform)
 function Feeds (db, opts) {
   if (!(this instanceof Feeds)) return new Feeds(db, opts)
   MangerTransform.call(this, db, opts)
   this.pushFeeds = true
   this.pushEntries = false
 }
+util.inherits(Feeds, MangerTransform)
 
 Feeds.prototype.retrieve = function (qry, cb) {
   var me = this
@@ -446,37 +506,28 @@ Feeds.prototype.retrieve = function (qry, cb) {
     } else if (val) {
       me.use(val)
     }
+    me = null
     cb()
+    cb = null
   })
 }
 
 // A stream of entries.
-util.inherits(Entries, MangerTransform)
 function Entries (db, opts) {
   if (!(this instanceof Entries)) return new Entries(db, opts)
   MangerTransform.call(this, db, opts)
   this.pushFeeds = false
   this.pushEntries = true
 }
+util.inherits(Entries, MangerTransform)
 
 Entries.prototype.retrieve = function (qry, cb) {
   var me = this
   var opts = schema.entries(qry.url, qry.since, true)
   var values = this.db.createValueStream(opts)
-  var done = onend
-  function onend (er) {
-    done = nop
-    var error
-    if (er) {
-      error = new Error('retrieve error: ' + er.message)
-    }
-    values.removeAllListeners()
-    cb(error)
-  }
   var ok = true
-
-  function use () { // HOT
-    if (!ok || done === nop) return
+  function use () {
+    if (!ok || !values) return
     var chunk
     while (ok && (chunk = values.read()) !== null) {
       ok = me.use(chunk)
@@ -488,9 +539,23 @@ Entries.prototype.retrieve = function (qry, cb) {
       })
     }
   }
+  function onend (er) {
+    if (!values) return
+    values.removeListener('readable', use)
+    values.removeListener('error', onerror)
+    values.removeListener('end', onend)
+    values = null
+    me = null
+    cb(er)
+    cb = null
+  }
+  function onerror (er) {
+    var error = new Error('retrieve error: ' + er.message)
+    onend(error)
+  }
   values.on('readable', use)
-  values.on('error', done)
-  values.on('end', done)
+  values.on('error', onerror)
+  values.on('end', onend)
 }
 
 // Transform feed keys to URLs.
@@ -529,11 +594,15 @@ function list (db, opts) {
     uris.emit('error', error)
   }
   function onend () {
-    keys.removeAllListeners()
+    keys.removeListener('end', onend)
+    keys.removeListener('error', onerror)
+    keys.removeListener('readable', write)
+    keys = null
     uris.end()
+    uris = null
   }
-  keys.on('error', onerror)
   keys.on('end', onend)
+  keys.on('error', onerror)
   keys.on('readable', write)
   return uris
 }
@@ -544,6 +613,7 @@ function FeedURLs (opts) {
   stream.Transform.call(this, opts)
 }
 util.inherits(FeedURLs, stream.Transform)
+
 FeedURLs.prototype._transform = function (chunk, enc, cb) {
   var uri = chunk.feed
   if (uri) {
@@ -559,41 +629,43 @@ FeedURLs.prototype._transform = function (chunk, enc, cb) {
 // that `flushCounter` has to be applied first, before update has any
 // effect.
 function update (db, opts, x) {
-  var copy = extend(Object.create(null), opts)
-  copy.force = true
-  copy.objectMode = true
-  function create () {
-    return new Feeds(db, copy)
-  }
+  var fopts = cp(opts)
+  fopts.force = true
+  fopts.objectMode = true
+  var s = new Feeds(db, fopts)
   var r = ranks(db, opts)
-  var s = speculum({ objectMode: true }, r, create, x)
-  var uris = new FeedURLs({ objectMode: true })
   var ok = true
+  function ondrain () {
+    ok = true
+    write()
+  }
   function write () {
-    if (!ok) return
-    var feed
-    while (ok && (feed = s.read()) !== null) {
-      ok = uris.write(feed)
+    if (!ok || !s) return
+    var chunk
+    while (ok && (chunk = r.read()) !== null) {
+      ok = s.write(chunk)
     }
     if (!ok) {
-      uris.once('drain', function () {
-        ok = true
-        write()
-      })
+      s.once('drain', ondrain)
     }
-  }
-  function onend () {
-    s.removeAllListeners()
-    uris.end()
   }
   function onerror (er) {
     var error = new Error('update error: ' + er.message)
-    uris.emit('error', error)
+    s.emit('error', error)
   }
-  s.on('readable', write)
-  s.on('error', onerror)
-  s.on('end', onend)
-  return uris
+  function onend () {
+    r.removeListener('end', onend)
+    r.removeListener('error', onerror)
+    r.removeListener('readable', write)
+    r = null
+    s.end()
+    s.removeListener('drain', ondrain)
+    s = null
+  }
+  r.on('end', onend)
+  r.on('error', onerror)
+  r.on('readable', write)
+  return s
 }
 
 function getFeed (db, uri, cb) {
@@ -653,17 +725,24 @@ function flushCounter (db, counter, cb) {
   cb = cb || nop
   rank(db, counter, function (er, count) {
     if (!er) counter.reset()
-    if (cb) cb(er, count)
+    cb(er, count)
+    cb = null
   })
 }
 
+function cp (it) {
+  var o = Object.create(null)
+  it = it ? extend(o, it) : o
+  return it
+}
+
 // Transforms rank keys to URLs.
-util.inherits(Ranks, stream.Transform)
 function Ranks (opts) {
   if (!(this instanceof Ranks)) return new Ranks(opts)
   stream.Transform.call(this, opts)
   this._readableState.objectMode = opts.objectMode
 }
+util.inherits(Ranks, stream.Transform)
 
 Ranks.prototype._transform = function (chunk, enc, cb) {
   var uri = schema.URIFromRank(chunk)
@@ -674,8 +753,6 @@ Ranks.prototype._transform = function (chunk, enc, cb) {
   }
 }
 
-// API
-util.inherits(Manger, events.EventEmitter)
 function Manger (name, opts) {
   if (!(this instanceof Manger)) return new Manger(name, opts)
   events.EventEmitter.call(this)
@@ -690,6 +767,7 @@ function Manger (name, opts) {
     cacheSize: this.opts.cacheSize
   })
 }
+util.inherits(Manger, events.EventEmitter)
 
 function Delete (key) {
   this.key = key
@@ -698,19 +776,22 @@ function Delete (key) {
 
 function ranks (db, opts) {
   var keys = db.createKeyStream(schema.allRanks)
-  var ranks = new Ranks(opts)
-  keys.once('error', function (er) {
-    keys.removeAllListeners()
+  var ranks = new Ranks(cp(opts))
+  function onend () {
+    ranks.end()
+    ranks.removeListener('drain', write)
+    ranks = null
+    keys.removeListener('error', onerror)
+    keys.removeListener('end', onend)
+    keys = null
+  }
+  function onerror (er) {
     ranks.emit('error', er)
-    ranks.end()
-  })
-  keys.once('end', function () {
-    keys.removeAllListeners()
-    ranks.end()
-  })
+    onend()
+  }
   var ok = true
   function write () {
-    if (!ok) return
+    if (!ok || !ranks || !keys) return
     var chunk
     while ((chunk = keys.read()) !== null) {
       ok = ranks.write(chunk)
@@ -722,7 +803,9 @@ function ranks (db, opts) {
       })
     }
   }
+  keys.on('end', onend)
   keys.on('readable', write)
+  keys.once('error', onerror)
   return ranks
 }
 
@@ -732,7 +815,6 @@ Manger.prototype.ranks = function () {
 }
 
 function resetRanks (db, cb) {
-  cb = cb || nop
   var ops = []
   var keys = db.createKeyStream(schema.allRanks)
   function read () {
@@ -742,20 +824,34 @@ function resetRanks (db, cb) {
       ops.push(op)
     }
   }
-  keys.on('readable', read)
-  keys.once('end', function () {
-    keys.removeAllListeners()
+  function onend (er) {
+    keys.removeListener('end', onend)
+    keys.removeListener('readable', read)
+    keys.removeListener('error', onerror)
+    keys = null
     if (ops.length) {
-      db.batch(ops, cb)
+      db.batch(ops, function (er) {
+        if (error) {
+          var error = new Error(er.message)
+          cb(error)
+        } else {
+          cb()
+          cb = null
+        }
+      })
+      ops = null
     } else {
-      cb()
+      cb(er)
+      cb = null
     }
-  })
-  keys.once('error', function (er) {
-    keys.removeAllListeners()
-    keys.end()
-    cb(er)
-  })
+  }
+  function onerror (er) {
+    var error = new Error(er.message)
+    onend(error)
+  }
+  keys.on('end', onend)
+  keys.on('readable', read)
+  keys.once('error', onerror)
 }
 
 Manger.prototype.resetRanks = function (cb) {
@@ -774,11 +870,17 @@ Manger.prototype.entries = function () {
     var c = counter.peek(k) || 0
     counter.set(k, ++c)
   }
-  function onfinish () {
+  function deinit () {
+    if (!s) return
+    s.removeListener('error', deinit)
+    s.removeListener('finish', deinit)
     s.removeListener('query', onquery)
+    s = null
+    counter = null
   }
+  s.on('error', deinit)
+  s.on('finish', deinit)
   s.on('query', onquery)
-  s.once('finish', onfinish)
   return s
 }
 
