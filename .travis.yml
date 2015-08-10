@@ -1,6 +1,4 @@
 language: node_js
-before_install:
-  - export JOBS=max
 node_js:
   - "2.0.0"
   - "1.8.1"

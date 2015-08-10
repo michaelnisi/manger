@@ -114,9 +114,7 @@ A [Readable](http://nodejs.org/api/stream.html#stream_class_stream_readable_1) s
 
 - `read()` `Buffer() | str()`
 
-### cache.update(x)
-
-- `x` `Number() | 5` The number of streams to engage concurrently
+### cache.update()
 
 Updates all ranked feeds and returns a stream that emits feed URLs of updated feeds. This, of course, could produce a resource heavy operation! Feeds are updated ordered by their popularity, using the rank index, therefore `flushCount` must have been invoked before this method can take any effect.
 

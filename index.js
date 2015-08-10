@@ -49,6 +49,7 @@ function Opts (opts) {
   this.redirects = opts.redirects || { set: nop, get: nop, has: nop }
 }
 
+// A new copy of options with default properties if required.
 function defaults (opts) {
   return new Opts(opts)
 }
@@ -61,6 +62,7 @@ function MangerTransform (db, opts) {
   if (!(this instanceof MangerTransform)) {
     return new MangerTransform(db, opts)
   }
+
   opts = defaults(opts)
 
   stream.Transform.call(this, db, { highWaterMark: opts.highWaterMark })
@@ -339,45 +341,42 @@ MangerTransform.prototype.uid = function (uri) {
   return [this.db.location, uri].join('~')
 }
 
-function Put (key, value) {
-  this.key = key
-  this.value = value
-  this.type = 'put'
-}
-
 function ended (writer) {
   var state = writer._writableState
   return state.ended || state.ending || state.finished
 }
 
 MangerTransform.prototype.parse = function (qry, res, cb) {
-  var me = this
-  var parser = pickup({ eventMode: true })
-  var uri = qry.url
-  var ops = []
-  var rest = []
-  var ok = true
+  var batch = this.db.batch()
   var count = 0
+  var me = this
+  var ok = true
+  var parser = pickup({ eventMode: true })
+  var rest = []
+  var uri = qry.url
+
   function done (er) {
     assert(++count === 1)
+
+    batch = null
     me = null
     parser.removeListener('entry', onentry)
     parser.removeListener('feed', onfeed)
     parser = null
-    uri = null
-    ops = null
-    rest = null
     qry = null
     res = null
+    rest = null
+    uri = null
+
     cb(er)
     cb = null
   }
   function onfeed (feed) {
     feed.feed = uri
     feed.updated = time(feed)
-    var key = schema.feed(uri)
-    var op = new Put(key, JSON.stringify(feed))
-    ops.push(op)
+    var k = schema.feed(uri)
+    var v = JSON.stringify(feed)
+    batch.put(k, v)
     if (!ok) {
       rest.push(feed)
     } else if (me.pushFeeds) {
@@ -387,9 +386,9 @@ MangerTransform.prototype.parse = function (qry, res, cb) {
   function onentry (entry) {
     entry.feed = uri
     entry.updated = time(entry)
-    var key = schema.entry(uri, entry.updated)
-    var op = new Put(key, JSON.stringify(entry))
-    ops.push(op)
+    var k = schema.entry(uri, entry.updated)
+    var v = JSON.stringify(entry)
+    batch.put(k, v)
     if (!ok) {
       rest.push(entry)
     } else if (me.pushEntries && newer(entry, qry)) {
@@ -420,7 +419,7 @@ MangerTransform.prototype.parse = function (qry, res, cb) {
     function write () {
       if (ended(writer) || !ok) return
       var chunk
-      while ((chunk = reader.read()) !== null) {
+      while (reader && (chunk = reader.read()) !== null) {
         ok = writer.write(chunk)
       }
       if (!ok) {
@@ -456,11 +455,10 @@ MangerTransform.prototype.parse = function (qry, res, cb) {
       writer = null
       if (isParser) {
         dispose(function (er) {
-          var tag = res.headers['etag'] || 'NO_ETAG'
-          var key = schema.etag(uri)
-          var op = new Put(key, tag)
-          ops.push(op)
-          me.db.batch(ops, function (er) {
+          var k = schema.etag(uri)
+          var v = res.headers['etag'] || 'NO_ETAG'
+          batch.put(k, v)
+          batch.write(function (er) {
             if (er) me.emit('error', er)
             done()
           })
@@ -697,27 +695,44 @@ function has (db, uri, cb) {
 }
 
 function remove (db, uri, cb) {
-  has(db, uri, function (er) {
-    if (er) return cb(er)
-    var ops = [
-      new Delete(schema.etag(uri)),
-      new Delete(schema.feed(uri))
-    ]
+  has(db, uri, function hasHandler (er) {
+    if (er) {
+      cb(er)
+      cb = null
+      return
+    }
+    function done (er) {
+      if (!cb) return
+      keys.removeListener('data', ondata)
+      keys.removeListener('end', onend)
+      keys.removeListener('error', onerror)
+      function error () {
+        if (er) {
+          return new Error('failed to remove: ' + er.message)
+        }
+      }
+      cb(error())
+      cb = null
+    }
     var opts = schema.entries(uri, Infinity)
     var keys = db.createKeyStream(opts)
-    keys.on('error', function (er) {
-      keys.removeAllListeners()
-      cb(er)
-    })
-    keys.on('data', function (chunk) {
-      ops.push(new Delete(chunk))
-    })
-    keys.on('end', function () {
-      keys.removeAllListeners()
-      db.batch(ops, function (er) {
-        cb(er)
+    var batch = db.batch()
+    batch.del(schema.etag(uri))
+    batch.del(schema.feed(uri))
+    function onerror (er) {
+      done(er)
+    }
+    function ondata (chunk) {
+      batch.del(chunk)
+    }
+    function onend () {
+      batch.write(function (er) {
+        done(er)
       })
-    })
+    }
+    keys.on('data', ondata)
+    keys.on('end', onend)
+    keys.on('error', onerror)
   })
 }
 
@@ -758,21 +773,27 @@ function Manger (name, opts) {
   events.EventEmitter.call(this)
 
   this.opts = defaults(opts)
-
+  // TODO: Move failures and redirects out of opts
   this.opts.failures = lru({ max: 500, maxAge: 36e5 * 24 })
   this.opts.redirects = lru({ max: 500, maxAge: 36e5 * 24 })
+
   this.counter = lru({ max: this.opts.counterMax })
-  this.db = levelup(name, {
+
+  var db = levelup(name, {
     keyEncoding: bytewise,
     cacheSize: this.opts.cacheSize
   })
+  var me = this
+  function dbGetter () {
+    if (!db || db.isClosed()) {
+      me.emit('error', new Error('no database'))
+    } else {
+      return db
+    }
+  }
+  Object.defineProperty(this, 'db', { get: dbGetter })
 }
 util.inherits(Manger, events.EventEmitter)
-
-function Delete (key) {
-  this.key = key
-  this.type = 'del'
-}
 
 function ranks (db, opts) {
   var keys = db.createKeyStream(schema.allRanks)
@@ -815,39 +836,36 @@ Manger.prototype.ranks = function () {
 }
 
 function resetRanks (db, cb) {
-  var ops = []
+  var batch = db.batch()
   var keys = db.createKeyStream(schema.allRanks)
-  function read () {
-    var key
-    while ((key = keys.read()) !== null) {
-      var op = new Delete(key)
-      ops.push(op)
-    }
-  }
-  function onend (er) {
+  function done (er) {
+    if (!cb) return
+    batch = null
     keys.removeListener('end', onend)
     keys.removeListener('readable', read)
     keys.removeListener('error', onerror)
     keys = null
-    if (ops.length) {
-      db.batch(ops, function (er) {
-        if (error) {
-          var error = new Error(er.message)
-          cb(error)
-        } else {
-          cb()
-          cb = null
-        }
-      })
-      ops = null
-    } else {
-      cb(er)
-      cb = null
+    function error () {
+      if (er) {
+        return new Error('failed to reset ranks: ' + er.message)
+      }
     }
+    cb(error())
+    cb = null
+  }
+  function onend (er) {
+    batch.write(function (er) {
+      done(er)
+    })
   }
   function onerror (er) {
-    var error = new Error(er.message)
-    onend(error)
+    done(er)
+  }
+  function read () {
+    var key
+    while ((key = keys.read()) !== null) {
+      batch.del(key)
+    }
   }
   keys.on('end', onend)
   keys.on('readable', read)
