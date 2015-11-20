@@ -32,14 +32,14 @@ One metadata object per XML feed.
 - `summary` `str()`
 - `title` `str()`
 - `ttl` `str()`
-- `updated` `str()`
+- `updated` `Number()`
 
 ### enclosure()
 
 A related resource of an `entry()`.
 
 - `href` `str()`
-- `length` `str()`
+- `length` `Number()`
 - `type` `str()`
 
 ### entry()
