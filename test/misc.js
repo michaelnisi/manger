@@ -2,6 +2,34 @@ var manger = require('../')
 var string_decoder = require('string_decoder')
 var test = require('tap').test
 
+test('charset from response', function (t) {
+  var f = manger.charsetFromResponse
+  function res (str) {
+    return {
+      headers: {
+        'content-type': str
+      },
+      getHeader: function (name) {
+        return this.headers[name]
+      }
+    }
+  }
+  var wanted = [
+    null,
+    null,
+    'UTF-8'
+  ]
+  var found = [
+    f(null),
+    f({}),
+    f(res('text/xml; charset=UTF-8'))
+  ]
+  t.plan(wanted.length)
+  wanted.forEach(function (it) {
+    t.is(found.shift(), it)
+  })
+})
+
 test('redirect', function (t) {
   var f = manger.redirect
   var wanted = [

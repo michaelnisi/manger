@@ -11,7 +11,7 @@ test('not modified', function (t) {
   t.plan(7)
   var setup = new stream.Transform()
   var headers = {
-    'content-type': 'application/json',
+    'content-type': 'text/xml; charset=UTF-8',
     'ETag': '55346232-18151'
   }
   var scopes = []

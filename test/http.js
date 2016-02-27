@@ -5,25 +5,32 @@ var nock = require('nock')
 var test = require('tap').test
 var path = require('path')
 
-test('ETag', { skip: false }, function (t) {
+test('ETag', function (t) {
   t.plan(10)
   var scope = nock('http://feeds.5by5.tv')
   var headers = {
-    'content-type': 'application/json',
+    'content-type': 'text/xml; charset=UTF-8',
     'ETag': '55346232-18151'
   }
   var mocks = [
-    { f: scope.get, code: 200 },
-    { f: scope.head, code: 200 },
-    { f: scope.head, code: 304 }
+    { method: 'GET', code: 200 },
+    { method: 'HEAD', code: 200 },
+    { method: 'HEAD', code: 304 }
   ]
   mocks.forEach(function (mock) {
-    mock.f('/b2w').reply(mock.code, function (req, body) {
-      if (mock.f === scope.get) {
+    var h
+    if (mock.method === 'GET') {
+      h = scope.get('/b2w')
+    } else if (mock.method === 'HEAD') {
+      h = scope.head('/b2w')
+    } else {
+      throw new Error('unhandled HTTP method')
+    }
+    h.reply(mock.code, function (req, body) {
+      if (mock.method === 'GET') {
         var p = path.join(__dirname, 'data', 'b2w.xml')
         return fs.createReadStream(p)
-      }
-      if (mock.f === scope.head) {
+      } else if (mock.method === 'HEAD') {
         var wanted = {
           'if-none-match': '55346232-18151',
           'accept-encoding': 'gzip',
@@ -31,6 +38,8 @@ test('ETag', { skip: false }, function (t) {
         }
         var found = this.req.headers
         t.same(found, wanted)
+      } else {
+        throw new Error('unhandled HTTP method')
       }
     }, headers)
   })
@@ -65,25 +74,25 @@ test('ETag', { skip: false }, function (t) {
   feeds.end()
 })
 
-test('redirection', { skip: false }, function (t) {
+test('redirection', function (t) {
   t.plan(4)
+  var headers = {
+    'content-type': 'text/xml; charset=UTF-8',
+    'ETag': '55346232-18151',
+    'Location': 'http://some/ddc'
+  }
   var scopes = [
     nock('http://just'),
     nock('http://some')
   ]
-  var headers = {
-    'content-type': 'application/json',
-    'ETag': '55346232-18151',
-    'Location': 'http://some/ddc'
-  }
-  scopes[0].get('/b2w').reply(301, function () {
+  nock('http://just').get('/b2w').reply(301, function () {
     t.pass(301)
   }, headers)
-  scopes[1].get('/ddc').reply(200, function () {
+  nock('http://some').get('/ddc').reply(200, function () {
     t.pass(200)
     var p = path.join(__dirname, 'data', 'ddc.xml')
     return fs.createReadStream(p)
-  }, headers)
+  })
   var cache = common.freshManger()
   var x = Math.random() > 0.5
   var s = x ? cache.feeds() : cache.entries()
@@ -107,7 +116,7 @@ test('redirection of cached', function (t) {
     nock('http://some')
   ]
   var headers = {
-    'content-type': 'application/json',
+    'content-type': 'text/xml; charset=UTF-8',
     'Location': 'http://some/ddc'
   }
   scopes[0].get('/b2w').reply(200, function () {

@@ -10,7 +10,7 @@ test('a single plain query', function (t) {
   t.plan(7)
   var scope = nock('http://just')
   var headers = {
-    'content-type': 'application/json',
+    'content-type': 'text/xml; charset=UTF-8',
     'ETAG': '55346232-18151'
   }
   scope.get('/b2w').reply(200, function () {

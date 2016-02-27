@@ -14,7 +14,7 @@ test('all', function (t) {
   t.plan(8)
   var scope = nock('http://just')
   function setup (zip) {
-    var headers = { 'content-type': 'application/json' }
+    var headers = { 'content-type': 'text/xml; charset=UTF-8' }
     if (zip) headers['content-encoding'] = 'gzip'
     scope.get('/b2w').reply(200, function () {
       var p = path.join(__dirname, 'data', 'b2w.xml')
@@ -58,7 +58,7 @@ test('all', function (t) {
 test('time range', function (t) {
   t.plan(5)
   var scopes = []
-  var headers = { 'content-type': 'application/json' }
+  var headers = { 'content-type': 'text/xml; charset=UTF-8' }
   var strs = ['http://just/b2w', 'http://some/ddc']
   strs.forEach(function (str) {
     var uri = url.parse(str)

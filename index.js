@@ -160,54 +160,53 @@ MangerTransform.prototype._request = function (qry, cb) {
   var mod = protocol([opts.protocol])
 
   var me = this
-  var req = mod.get(opts, function (res) {
+  var req = mod.get(opts, function responseHandler (res) {
     var h = headary(res)
     if (h.ok) {
-      me.parse(qry, res, function (er) {
+      return me.parse(qry, res, function (er) {
         cb(er)
         cb = null
         me = null
       })
+    }
+    res.resume() // dismiss data
+    if (h.message) {
+      var er = new Error(h.message)
+      var key = failureKey('GET', qry.url)
+      me.failures.set(key, h.message)
+      me.emit('error', er)
+      cb()
+      cb = null
+      me = null
     } else {
-      if (h.message) {
-        var er = new Error(h.message)
-        var key = failureKey('GET', qry.url)
-        me.failures.set(key, h.message)
-        me.emit('error', er)
-        cb()
-        cb = null
-        me = null
-      } else {
-        res.req.abort()
-        if (h.url) {
-          me.redirects.set(qry.url, h.url)
-          var nq = qry.clone(h.url)
-          if (h.permanent) {
-            remove(me.db, qry.url, function (er) {
-              if (er && !er.notFound) me.emit('error', er)
-              me.request(nq, cb)
-              nq = null
-              cb = null
-            })
-          } else {
-            me.request(nq, cb)
-            nq = null
-            me = null
-            cb = null
-          }
-        } else if (h.permanent) {
+      if (h.url) {
+        me.redirects.set(qry.url, h.url)
+        var nq = qry.clone(h.url)
+        if (h.permanent) {
           remove(me.db, qry.url, function (er) {
             if (er && !er.notFound) me.emit('error', er)
-            cb()
+            me.request(nq, cb)
+            nq = null
             cb = null
-            me = null
           })
         } else {
-          me.retrieve(qry, cb)
+          me.request(nq, cb)
+          nq = null
           me = null
-          qry = null
           cb = null
         }
+      } else if (h.permanent) {
+        remove(me.db, qry.url, function (er) {
+          if (er && !er.notFound) me.emit('error', er)
+          cb()
+          cb = null
+          me = null
+        })
+      } else {
+        me.retrieve(qry, cb)
+        me = null
+        qry = null
+        cb = null
       }
     }
   })
@@ -346,17 +345,44 @@ function ended (writer) {
   return state.ended || state.ending || state.finished
 }
 
+function charsetFromResponse (res) {
+  if (!res) return null
+  var a
+  if (typeof res.getHeader === 'function') {
+    a = res.getHeader('content-type')
+  } else if (!res.headers) {
+    return null
+  } else {
+    a = res.headers['content-type']
+  }
+  if (typeof a !== 'string') return null
+  var b = a.split('charset')[1]
+  if (typeof b !== 'string') return null
+  var c = b.split('=')[1]
+  if (typeof c !== 'string') return null
+  return c.trim()
+}
+
+function PickupOpts (charset) {
+  this.charset = charset
+  this.eventMode = true
+}
+
 MangerTransform.prototype.parse = function (qry, res, cb) {
   var batch = this.db.batch()
   var count = 0
   var me = this
   var ok = true
-  var parser = pickup({ eventMode: true })
+
+  var charset = charsetFromResponse(res)
+  var opts = new PickupOpts(charset)
+  var parser = pickup(opts)
+
   var rest = []
   var uri = qry.url
 
   function done (er) {
-    assert(++count === 1)
+    assert(++count === 1, 'programmer error: done means done')
 
     batch = null
     me = null
@@ -422,7 +448,7 @@ MangerTransform.prototype.parse = function (qry, res, cb) {
       while (reader && (chunk = reader.read()) !== null) {
         ok = writer.write(chunk)
       }
-      if (!ok) {
+      if (writer && !ok) {
         writer.once('drain', function () {
           ok = true
           write()
@@ -438,12 +464,11 @@ MangerTransform.prototype.parse = function (qry, res, cb) {
     }
     function onerror (er) {
       if (!me) return
-      var error = new Error('parse error: ' + er.message)
+      var error = new Error('parse error: ' + er.message + ': parsing: ' + uri)
       me.emit('error', error)
       var key = failureKey('GET', uri)
       me.failures.set(key, er.message)
       onend()
-      done()
     }
     function onfinish () {
       if (writer) {
@@ -928,6 +953,7 @@ if (parseInt(process.env.NODE_TEST, 10) === 1) {
   exports.Feeds = Feeds
   exports.Manger = Manger
   exports.URLs = URLs
+  exports.charsetFromResponse = charsetFromResponse
   exports.debug = debug
   exports.failureKey = failureKey
   exports.getETag = getETag
