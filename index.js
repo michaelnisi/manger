@@ -15,6 +15,7 @@ var lru = require('lru-cache')
 var pickup = require('pickup')
 var query = require('./lib/query')
 var rank = require('./lib/rank')
+var sanitize = require('sanitize-html')
 var schema = require('./lib/schema')
 var stream = require('readable-stream')
 var string_decoder = require('string_decoder')
@@ -164,6 +165,11 @@ MangerTransform.prototype._request = function (qry, cb) {
     var h = headary(res)
     if (h.ok) {
       return me.parse(qry, res, function (er) {
+        // TODO: Investigate parse error
+        //
+        // This got called after cb has been set to null. A parse error though,
+        // reached the user. This might mean that the parse function applies the
+        // callback more than once, which, I think, should not happen.
         cb(er)
         cb = null
         me = null
@@ -368,6 +374,19 @@ function PickupOpts (charset) {
   this.eventMode = true
 }
 
+var allowedTags = [
+  'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'p', 'a', 'ul', 'ol', 'li',
+  'b', 'i', 'strong', 'em', 'code', 'br', 'div', 'pre'
+]
+
+function html (str) {
+  if (typeof str !== 'string') return null
+  var s = sanitize(str, {
+    allowedTags: allowedTags
+  })
+  return s
+}
+
 MangerTransform.prototype.parse = function (qry, res, cb) {
   var batch = this.db.batch()
   var count = 0
@@ -412,6 +431,8 @@ MangerTransform.prototype.parse = function (qry, res, cb) {
   function onentry (entry) {
     entry.feed = uri
     entry.updated = time(entry)
+    entry.summary = html(entry.summary)
+
     var k = schema.entry(uri, entry.updated)
     var v = JSON.stringify(entry)
     batch.put(k, v)
@@ -951,6 +972,7 @@ Manger.prototype.remove = function (uri, cb) {
 if (parseInt(process.env.NODE_TEST, 10) === 1) {
   exports.Entries = Entries
   exports.Feeds = Feeds
+  exports.html = html
   exports.Manger = Manger
   exports.URLs = URLs
   exports.charsetFromResponse = charsetFromResponse

@@ -1,6 +1,6 @@
 {
   "name": "manger",
-  "version": "2.0.8",
+  "version": "2.1.0",
   "description": "cache feeds",
   "main": "index.js",
   "scripts": {
@@ -34,7 +34,8 @@
     "levelup": "^1.3.1",
     "lru-cache": "^2.7.0",
     "pickup": "^3.1.0",
-    "readable-stream": "^2.0.5"
+    "readable-stream": "^2.0.5",
+    "sanitize-html": "^1.13.0"
   },
   "devDependencies": {
     "lino": "^1.0.0",

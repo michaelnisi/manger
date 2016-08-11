@@ -42,19 +42,23 @@ A related resource of an `entry()`.
 - `length` `Number()`
 - `type` `str()`
 
+### html()
+
+An HTML-sanitized `String()`.
+
 ### entry()
 
 An individual entry.
 
 - `author` `str()`
-- `enclosure enclosure() | void()`
+- `enclosure` `enclosure() | void()`
 - `duration` `str()`
 - `feed` `str()`
 - `id` `str()`
 - `image` `str()`
 - `link` `str()`
 - `subtitle` `str()`
-- `summary` `str()`
+- `summary` `html() | void()`
 - `title` `str()`
 - `updated` `str()`
 
