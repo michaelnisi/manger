@@ -2,14 +2,16 @@ var common = require('./lib/common')
 var test = require('tap').test
 
 test('queries and requests', function (t) {
-  function go (t, s) {
-    var buf = ''
-    s.on('data', function (chunk) {
-      buf += chunk
-    })
+  function go (s, t) {
     var found = []
     s.on('error', function (er) {
       found.push(er)
+    })
+
+    var buf = ''
+    s.on('readable', function () {
+      var chunk
+      while ((chunk = s.read()) !== null) { buf += chunk }
     })
     // Failed requests are cached, an error is emitted only for the first
     // failure per URL. Invalid queries do not produce requests, so errors
@@ -25,40 +27,26 @@ test('queries and requests', function (t) {
       wanted.forEach(function (it) {
         t.ok(found.shift().message.match(new RegExp(it)))
       })
+      t.end()
     })
-    function write (uris) {
-      var ok = true
-      var uri
-      do {
-        uri = uris.shift()
-        if (uri) ok = s.write(uri)
-      } while (ok && uri)
-      if (!ok && uri) {
-        s.once('drain', function () {
-          write(uris)
-        })
-      }
-      s.end()
-    }
-    write([
-      'xxx',
-      'http://xxx', // goes into failure cache
-      'xxx',
-      'http://xxx'
-    ])
+
+    t.ok(s.write('abc'))
+    t.ok(s.write('http://def'))
+    t.ok(s.write('ghi'))
+    t.ok(s.write('http://def'))
+    s.end()
   }
+
   t.plan(2)
   t.test('feeds', function (t) {
     var store = common.freshManger()
     var feeds = store.feeds()
-    t.plan(5)
-    go(t, feeds)
+    go(feeds, t)
   })
   t.test('entries', function (t) {
     var store = common.freshManger()
     var entries = store.entries()
-    t.plan(5)
-    go(t, entries)
+    go(entries, t)
   })
 })
 

@@ -1,3 +1,4 @@
+.nyc_output
 .pid
 TAP
 node_modules

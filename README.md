@@ -186,6 +186,10 @@ This stream transforms JSON to queries which can be piped to `feeds()` and `entr
 
 Where `"since"` can be anything `Date()` is able to parse.
 
+#### Event: 'warn'
+
+To make piping easier—by not breaking pipes—the queries stream emits a `'warning'` event instead of an `'error'` event if it encounters an invalid query. General stream errors, of course, are still emitted nevertheless.
+
 ## Installation
 
 With [npm](https://npmjs.org/package/manger) do:

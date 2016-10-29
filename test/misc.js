@@ -1,5 +1,5 @@
 var manger = require('../')
-var string_decoder = require('string_decoder')
+var stringDecoder = require('string_decoder')
 var test = require('tap').test
 
 // TODO: Rename 'misc.js' to something less subtle
@@ -91,7 +91,7 @@ test('process query', function (t) {
     manger.query('abc', undefined, undefined, true)
   ]
   function Surrogate (force) {
-    this.decoder = new string_decoder.StringDecoder()
+    this.decoder = new stringDecoder.StringDecoder()
     this.force = force || false
   }
   var m = new Surrogate()

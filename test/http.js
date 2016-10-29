@@ -1,9 +1,42 @@
-var common = require('./lib/common')
-var fs = require('fs')
-var manger = require('../')
-var nock = require('nock')
-var test = require('tap').test
-var path = require('path')
+// http - test HTTP related things
+
+const StringDecoder = require('string_decoder').StringDecoder
+const common = require('./lib/common')
+const fs = require('fs')
+const manger = require('../')
+const nock = require('nock')
+const path = require('path')
+const test = require('tap').test
+
+test('socket destruction', (t) => {
+  nock('http://abc.de').get('/').reply(function () {
+    this.req.destroy()
+  })
+
+  const store = common.freshManger()
+  const feeds = store.feeds()
+  const uri = 'http://abc.de/'
+  const qry = manger.query(uri, null, null, true)
+  t.ok(feeds.write(qry))
+  feeds.end()
+
+  var buf = ''
+  const dec = new StringDecoder('utf8')
+  feeds.on('end', () => {
+    const found = dec.write(buf)
+    t.is(found, '[]')
+    t.end()
+  })
+  feeds.on('readable', () => {
+    var chunk
+    while ((chunk = feeds.read())) { buf += chunk }
+  })
+  feeds.on('error', (er) => {
+    console.log(er)
+  })
+  // Well OK! I guess, this doesn't work with nock. I'd expect a 'socket hang up'
+  // error here.
+})
 
 test('ETag', function (t) {
   t.plan(10)
@@ -32,9 +65,11 @@ test('ETag', function (t) {
         return fs.createReadStream(p)
       } else if (mock.method === 'HEAD') {
         var wanted = {
-          'if-none-match': '55346232-18151',
+          'accept': '*/*',
           'accept-encoding': 'gzip',
-          host: 'feeds.5by5.tv'
+          'host': 'feeds.5by5.tv',
+          'if-none-match': '55346232-18151',
+          'user-agent': `nodejs/${process.version}`
         }
         var found = this.req.headers
         t.same(found, wanted)
