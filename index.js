@@ -226,6 +226,7 @@ MangerTransform.prototype._request = function (qry, cb) {
       done(er)
     } else {
       if (h.url) {
+        debug(`redirecting to ${h.url}`)
         me.redirects.set(qry.url, h.url)
         var nq = qry.clone(h.url)
         if (h.permanent) {
@@ -252,7 +253,7 @@ MangerTransform.prototype._request = function (qry, cb) {
   }
 
   function onRequestError (er) {
-    // debug(er)
+    debug(er)
     req.abort()
 
     var key = failureKey('GET', qry.url)
@@ -268,7 +269,7 @@ MangerTransform.prototype._request = function (qry, cb) {
   }
 
   var req = mod.get(opts, onResponse)
-  debug('get: %j', opts)
+  debug(opts)
 
   req.once('error', onRequestError)
 }

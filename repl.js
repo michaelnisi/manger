@@ -1,56 +1,56 @@
 #!/usr/bin/env node
 
-// repl - dev REPL
+// repl - explore manger
 
-var fs = require('fs')
-var lino = require('lino')
-var manger = require('./')
-var repl = require('repl')
-var util = require('util')
+const fs = require('fs')
+const lino = require('lino')
+const manger = require('./')
+const repl = require('repl')
+const util = require('util')
 
-var ctx = repl.start({
+const ctx = repl.start({
   prompt: 'manger> ',
   ignoreUndefined: true,
   input: process.stdin,
   output: process.stdout
 }).context
 
-var name = process.argv[2] || '/tmp/manger-repl'
-var svc = manger(name, {
+const name = process.argv[2] || '/tmp/manger-repl'
+const svc = manger(name, {
   objectMode: true
 })
 
-var entries = svc.entries()
-var feeds = svc.feeds()
-var list = function () {
-  var s = svc.list()
+const entries = svc.entries()
+const feeds = svc.feeds()
+const list = () => {
+  const s = svc.list()
   s.on('error', console.error)
   return s
 }
-var update = function () {
-  var s = svc.update()
-  s.on('error', function (er) {
+const update = function () {
+  const s = svc.update()
+  s.on('error', (er) => {
     console.error(er.stack)
   })
   return s
 }
-var ranks = function () {
-  var s = svc.ranks()
+const ranks = function () {
+  const s = svc.ranks()
   s.on('error', console.error)
   return s
 }
-var resetRanks = function () {
-  svc.resetRanks(function (er) {
+const resetRanks = function () {
+  svc.resetRanks((er) => {
     if (er) console.error(er)
   })
 }
 
-;[entries, feeds].map(function (s) {
+;[entries, feeds].map((s) => {
   s.on('error', console.error)
 })
 
 function read (stream, prop) {
-  var obj
+  let obj
   while ((obj = stream.read()) !== null) {
     console.log(util.inspect(
       prop ? obj[prop] : obj, { colors: true }))
@@ -58,10 +58,10 @@ function read (stream, prop) {
 }
 
 function fill () {
-  var lines = lino()
-  var ok = true
+  const lines = lino()
+  let ok = true
   function _read () {
-    var chunk
+    let chunk
     while (ok && (chunk = lines.read()) !== null) {
       ok = feeds.write(chunk)
     }
@@ -70,7 +70,7 @@ function fill () {
     }
   }
   lines.on('readable', _read)
-  fs.createReadStream('./test/data/FEEDS')
+  fs.createReadStream('./test/data/feeds')
     .pipe(lines)
 }
 
