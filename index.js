@@ -404,7 +404,7 @@ function PickupOpts (charset) {
   this.eventMode = true
 }
 
-var allowedTags = [
+const allowedTags = [
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'p', 'a', 'ul', 'ol', 'li',
   'b', 'i', 'strong', 'em', 'code', 'br', 'div', 'pre'
 ]
@@ -423,9 +423,9 @@ function html (str) {
 MangerTransform.prototype.parse = function (qry, res, cb) {
   const uri = qry.url
 
-  // It still escapes me why http.IncomingMessage wouldn't provide the URL of its
+  // It still escapes me, why http.IncomingMessage wouldn't provide the URL of its
   // originating request. Anyways, just pass the query to provide it.
-  debug('parse %s', uri)
+  debug('parsing %s', uri)
 
   const me = this
 

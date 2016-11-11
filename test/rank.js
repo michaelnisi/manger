@@ -1,3 +1,5 @@
+'use strict'
+
 var common = require('./lib/common')
 var bytewise = require('bytewise')
 var lru = require('lru-cache')

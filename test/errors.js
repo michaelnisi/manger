@@ -1,3 +1,5 @@
+'use strict'
+
 var common = require('./lib/common')
 var test = require('tap').test
 

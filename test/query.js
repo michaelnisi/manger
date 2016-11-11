@@ -1,3 +1,5 @@
+'use strict'
+
 const fs = require('fs')
 const query = require('../lib/query')
 const lino = require('lino')

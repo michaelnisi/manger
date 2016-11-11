@@ -1,3 +1,5 @@
+'use strict'
+
 var assert = require('assert')
 var common = require('./lib/common')
 var fs = require('fs')

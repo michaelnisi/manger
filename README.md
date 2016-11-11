@@ -1,8 +1,9 @@
+[![Build Status](https://secure.travis-ci.org/michaelnisi/manger.svg)](http://travis-ci.org/michaelnisi/manger)
+[![Coverage Status](https://coveralls.io/repos/github/michaelnisi/manger/badge.svg?branch=master)](https://coveralls.io/github/michaelnisi/manger?branch=master)
+
 # manger - cache feeds
 
-The **manger** [Node](http://nodejs.org/) package caches RSS and Atom formatted XML feeds using [LevelUP](https://github.com/rvagg/node-levelup). It provides an interface to query entries by feed and time.
-
-[![Build Status](https://secure.travis-ci.org/michaelnisi/manger.svg)](http://travis-ci.org/michaelnisi/manger)
+The **manger** [Node](http://nodejs.org/) package provides caching for RSS and Atom formatted XML feeds. It provides an interface to query entries by feed and time.
 
 ## Types
 
@@ -120,7 +121,7 @@ A [Readable](http://nodejs.org/api/stream.html#stream_class_stream_readable_1) s
 
 ### cache.update()
 
-Updates all ranked feeds and returns a stream that emits feed URLs of updated feeds. This, of course, could produce a resource heavy operation! Feeds are updated ordered by their popularity, using the rank index, therefore `flushCount` must have been invoked before this method can take any effect.
+Updates all ranked feeds and returns a stream that emits feed URLs of updated feeds. This, of course, could produce a resource heavy operation! Feeds are updated ordered by their popularity, using the rank index, therefore `flushCounter` must have been invoked before this method can take any effect.
 
 - `read()` `str()`
 
@@ -192,7 +193,7 @@ To make piping easier—by not breaking pipes—the queries stream emits a `'war
 
 ## Installation
 
-With [npm](https://npmjs.org/package/manger) do:
+With [npm](https://npmjs.org/package/manger), do:
 
 ```
 $ npm install manger

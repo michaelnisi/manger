@@ -1,3 +1,5 @@
+'use strict'
+
 // http - test HTTP related things
 
 const StringDecoder = require('string_decoder').StringDecoder
