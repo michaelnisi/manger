@@ -1,3 +1,5 @@
+'use strict'
+
 var bytewise = require('bytewise')
 var common = require('./lib/common')
 var schema = require('../lib/schema')

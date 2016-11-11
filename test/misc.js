@@ -1,3 +1,5 @@
+'use strict'
+
 var manger = require('../')
 var stringDecoder = require('string_decoder')
 var test = require('tap').test

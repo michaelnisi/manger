@@ -1,31 +1,33 @@
-var common = require('./lib/common')
-var test = require('tap').test
-var manger = require('../')
+'use strict'
 
-test('URLs', function (t) {
-  var s = new manger.URLs()
-  var names = ['end', 'readable']
-  names.forEach(function (name) {
-    s.on(name, function () {
+const common = require('./lib/common')
+const test = require('tap').test
+const manger = require('../')
+
+test('URLs', (t) => {
+  const s = new manger.URLs()
+  const names = ['end', 'readable']
+  names.forEach((name) => {
+    s.on(name, () => {
       t.fail('should not become readable or end')
     })
   })
   setTimeout(t.end.bind(t), 100)
 })
 
-test('empty list', function (t) {
-  var store = common.freshManger()
-  var urls = store.list()
+test('empty list', (t) => {
+  const store = common.freshManger()
+  const urls = store.list()
   t.plan(2)
-  urls.on('readable', function () {
+  urls.on('readable', () => {
     t.is(urls.read(), null, 'should become readable')
   })
-  urls.on('end', function () {
+  urls.on('end', () => {
     t.ok(true, 'should end')
   })
 })
 
-test('teardown', function (t) {
+test('teardown', (t) => {
   t.ok(!common.teardown())
   t.end()
 })

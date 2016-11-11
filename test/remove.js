@@ -1,3 +1,5 @@
+'use strict'
+
 var common = require('./lib/common')
 var fs = require('fs')
 var nock = require('nock')
