@@ -1,3 +1,5 @@
+'use strict'
+
 const strings = require('../lib/strings')
 const test = require('tap').test
 
