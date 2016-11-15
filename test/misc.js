@@ -133,33 +133,3 @@ test('newer', function (t) {
     t.same(found.shift(), it)
   })
 })
-
-test('html', function (t) {
-  var f = manger.html
-  var wanted = [
-    null,
-    null,
-    null,
-    '',
-    '<h1>Headlines are fine</h1>',
-    '<h1>Headline are fine</h1><p>Paragraphs too</p>',
-    '<h1>Headline are fine</h1><p>Paragraphs too, but no images</p>',
-    'no tables',
-    '<br />self closing<br />'
-  ]
-  var found = [
-    f(),
-    f(null),
-    f(0),
-    f(''),
-    f('<h1>Headlines are fine</h1>'),
-    f('<h1>Headline are fine</h1><p>Paragraphs too</p>'),
-    f('<h1>Headline are fine</h1><p>Paragraphs too, <img>but no images</img></p>'),
-    f('<table>no tables<table>'),
-    f('<br>self closing<br>')
-  ]
-  t.plan(wanted.length)
-  wanted.forEach(function (it) {
-    t.same(found.shift(), it)
-  })
-})

@@ -18,10 +18,10 @@ const lru = require('lru-cache')
 const pickup = require('pickup')
 const query = require('./lib/query')
 const rank = require('./lib/rank')
-const sanitize = require('sanitize-html')
 const schema = require('./lib/schema')
 const stream = require('readable-stream')
 const stringDecoder = require('string_decoder')
+const strings = require('./lib/strings')
 const util = require('util')
 const zlib = require('zlib')
 
@@ -404,19 +404,6 @@ function PickupOpts (charset) {
   this.eventMode = true
 }
 
-const allowedTags = [
-  'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'p', 'a', 'ul', 'ol', 'li',
-  'b', 'i', 'strong', 'em', 'code', 'br', 'div', 'pre'
-]
-
-function html (str) {
-  if (typeof str !== 'string') return null
-  var s = sanitize(str, {
-    allowedTags: allowedTags
-  })
-  return s
-}
-
 // Parses response body for feeds and entries, unzipping it if necessary and save
 // the found feeds and entries to the database. When finished, the callback is
 // is applied with an eventual error.
@@ -450,8 +437,8 @@ MangerTransform.prototype.parse = function (qry, res, cb) {
   function onEntry (entry) {
     entry.feed = uri
     entry.updated = time(entry)
-    entry.summary = html(entry.summary)
-
+    entry.summary = strings.html(entry.summary)
+    entry.duration = strings.duration(entry.duration)
     var k = schema.entry(uri, entry.updated)
     var v = JSON.stringify(entry)
     batch.put(k, v)
@@ -1016,7 +1003,6 @@ Manger.prototype.remove = function (uri, cb) {
 if (parseInt(process.env.NODE_TEST, 10) === 1) {
   exports.Entries = Entries
   exports.Feeds = Feeds
-  exports.html = html
   exports.Manger = Manger
   exports.URLs = URLs
   exports.charsetFromResponse = charsetFromResponse

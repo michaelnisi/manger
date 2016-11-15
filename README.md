@@ -53,7 +53,7 @@ An individual entry.
 
 - `author` `str()`
 - `enclosure` `enclosure() | void()`
-- `duration` `str()`
+- `duration` `Number() | null` The value of the `<itunes:duration>` tag in seconds or `null`.
 - `feed` `str()`
 - `id` `str()`
 - `image` `str()`
