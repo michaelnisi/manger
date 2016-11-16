@@ -14,7 +14,8 @@ test('duration', (t) => {
     3600,
     5400,
     5400,
-    5400
+    5400,
+    null
   ]
   const found = [
     f(null),
@@ -25,7 +26,8 @@ test('duration', (t) => {
     f('60:00'),
     f('01:30:00'),
     f('01:30:00:55'),
-    f('1:30:0')
+    f('1:30:0'),
+    f('00:00:00')
   ]
   t.plan(wanted.length)
   wanted.forEach((it) => {
