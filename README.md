@@ -45,7 +45,7 @@ A related resource of an `entry()`.
 
 ### html()
 
-An HTML-sanitized `String()`.
+An sanitized HTML `String()` with tags limited to: `'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'p', 'a', 'ul', 'ol', 'li', 'b', 'i', 'strong', 'em', 'code', 'br', 'div', 'pre'`.
 
 ### entry()
 
@@ -89,15 +89,15 @@ Options for a `Manger` instance.
 The **manger** module exports a single function that returns a new `cache` object (an instance of `Manger`). To access the `Manger` class `require('manger')`.
 
 ```js
-var manger = require('manger')
-var cache = manger('/tmp/manger.db')
+const manger = require('manger')
+const cache = manger('/tmp/manger.db')
 ```
 
-If `opts` has `objectMode` set to `true`, results are read as `Object` types, instead of [`Buffer`](https://nodejs.org/api/buffer.html) moulding valid [JSON](http://json.org/).
+If `opts` has `objectMode` set to `true`, results are read as `Object` types, instead of [`Buffer`](https://nodejs.org/api/buffer.html), moulding valid [JSON](http://json.org/).
 
 **manger** leverages the lexicographical key sort order of [LevelDB](http://leveldb.org/). The keys are designed to stream feeds or entries in time ranges between now and some user defined point in the past.
 
-The distinction between feed and entries might be unclear. A feed models the metadata of an RSS or Atom feed (title, author, published, etc.), while entries are the actual items in the feed. These are detached to not repeatedly transmit feed metadata—after all **manger** tries to save round-trips.
+The distinction between feed and entries might be unclear. A feed models the metadata of an RSS or Atom feed (title, author, published, etc.), while entries are the actual items in the feed. These are detached to not repeatedly transmit feed metadata—after all **manger** tries to reduce round-trips.
 
 ### cache.entries()
 

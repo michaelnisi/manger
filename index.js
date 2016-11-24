@@ -117,16 +117,21 @@ function redirect (sc) {
   return sc >= 300 && sc < 400
 }
 
-function protocol (name) {
-  return { 'http:': http, 'https:': https }[name]
+MangerTransform.prototype.httpModule = function (name) {
+  if (name === 'http:') return [null, http]
+  if (name === 'https:') return [null, https]
+  return [new Error('invalid protocol')]
 }
 
 MangerTransform.prototype.head = function (qry, cb) {
-  var opts = qry.request('HEAD')
-  var mod = protocol([opts.protocol])
-  var me = this
+  const opts = qry.request('HEAD')
 
-  var headResponse = function (res) {
+  const [er, mod] = this.httpModule(opts.protocol)
+  if (er) {
+    return cb(er)
+  }
+
+  let headResponse = (res) => {
     function next (er, res) {
       res.removeListener('error', responseError)
       res.removeListener('end', responseEnd)
@@ -155,11 +160,11 @@ MangerTransform.prototype.head = function (qry, cb) {
     cb = null
   }
 
-  var req = mod.request(opts, headResponse)
+  let req = mod.request(opts, headResponse)
 
-  function requestError (er) {
+  let requestError = (er) => {
     const key = failureKey('HEAD', qry.url)
-    me.failures.set(key, er.message)
+    this.failures.set(key, er.message)
     done(er)
   }
 
@@ -183,9 +188,15 @@ function failureKey (method, uri) {
 }
 
 MangerTransform.prototype._request = function (qry, cb) {
-  var opts = qry.request()
-  var mod = protocol([opts.protocol])
-  var me = this
+  const opts = qry.request()
+
+  const [er, mod] = this.httpModule(opts.protocol)
+  if (er) {
+    this.emit('error', er)
+    return cb()
+  }
+
+  let me = this
 
   function done (er) {
     // The `notFound` property was set by levelup, marking this error irrelevant.
@@ -201,18 +212,18 @@ MangerTransform.prototype._request = function (qry, cb) {
     onResponse = onParse = onRemove = onRemoveAfterRedirect = nop
   }
 
-  var onParse = function (er) {
+  let onParse = function (er) {
     done(er)
   }
 
-  var onRemove = function (er) {
+  let onRemove = function (er) {
     done(er)
   }
 
-  var onRemoveAfterRedirect // defined later, so we can cleanup its scope
+  let onRemoveAfterRedirect // defined later, so we can cleanup its scope
 
-  var onResponse = function (res) {
-    var h = headary(res)
+  let onResponse = function (res) {
+    const h = headary(res)
     if (h.ok) {
       return me.parse(qry, res, onParse)
     }
@@ -220,15 +231,15 @@ MangerTransform.prototype._request = function (qry, cb) {
     res.resume() // to dismiss eventual data
 
     if (h.message) {
-      var er = new Error(h.message)
-      var key = failureKey('GET', qry.url)
+      const er = new Error(h.message)
+      const key = failureKey('GET', qry.url)
       me.failures.set(key, h.message)
       done(er)
     } else {
       if (h.url) {
         debug(`redirecting to ${h.url}`)
         me.redirects.set(qry.url, h.url)
-        var nq = qry.clone(h.url)
+        let nq = qry.clone(h.url)
         if (h.permanent) {
           onRemoveAfterRedirect = function (er) {
             if (er && !er.notFound) me.emit('error', er)
@@ -256,7 +267,7 @@ MangerTransform.prototype._request = function (qry, cb) {
     debug(er)
     req.abort()
 
-    var key = failureKey('GET', qry.url)
+    const key = failureKey('GET', qry.url)
     me.failures.set(key, er.message)
 
     const error = new Error(er.message)
@@ -268,7 +279,7 @@ MangerTransform.prototype._request = function (qry, cb) {
     done(er)
   }
 
-  var req = mod.get(opts, onResponse)
+  let req = mod.get(opts, onResponse)
   debug(opts)
 
   req.once('error', onRequestError)
@@ -291,12 +302,28 @@ MangerTransform.prototype.request = function (qry, cb) {
     if (this.ignore('HEAD', qry.url)) {
       return cb()
     }
-    var me = this
-    this.head(qry, function (er, res) {
+    this.head(qry, (er, res) => {
       if (er) {
-        me.emit('error', er)
-        me._request(qry, cb)
-        me = cb = qry = null
+        this.emit('error', er)
+
+        const blacklist = RegExp([
+          'ENOTFOUND'
+          // TODO: Add more errors after which to abort after HEAD
+        ].join('|'), 'i')
+        const msg = er.message
+        if (msg.match(blacklist) !== null) {
+          const uri = qry.url
+          const key = failureKey('HEAD', uri)
+          this.failures.set(key, er.message)
+          return remove(this.db, uri, (er) => {
+            if (er && !er.notFound) this.emit('error', er)
+            cb()
+            cb = qry = null
+          })
+        }
+
+        this._request(qry, cb)
+        cb = qry = null
         return
       }
       var h = headary(res)
@@ -304,34 +331,34 @@ MangerTransform.prototype.request = function (qry, cb) {
         if (res.headers.etag === qry.etag) {
           cb()
         } else {
-          me._request(qry, cb)
+          this._request(qry, cb)
         }
-        me = cb = qry = null
+        cb = qry = null
       } else {
         if (h.message) {
           er = new Error(h.message)
-          me._request(qry, cb)
+          this._request(qry, cb)
         } else if (h.url) {
-          var nq = qry.clone(h.url)
+          const nq = qry.clone(h.url)
           if (h.permanent) {
-            remove(me.db, qry.url, function (er) {
-              if (er && !er.notFound) me.emit('error', er)
-              me.request(nq, cb)
+            remove(this.db, qry.url, function (er) {
+              if (er && !er.notFound) this.emit('error', er)
+              this.request(nq, cb)
             })
           } else {
-            me.request(nq, cb)
+            this.request(nq, cb)
           }
-          me = qry = null
+          qry = null
         } else if (h.permanent) {
-          remove(me.db, qry.url, function (er) {
-            if (er && !er.notFound) me.emit('error', er)
+          remove(this.db, qry.url, function (er) {
+            if (er && !er.notFound) this.emit('error', er)
             cb()
             cb = null
           })
-          me = qry = null
+          qry = null
         } else {
           cb()
-          me = qry = cb = null
+          qry = cb = null
         }
       }
     })
@@ -357,10 +384,11 @@ MangerTransform.prototype._transform = function (qry, enc, cb) {
     this.emit('error', new Error('query error: invalid query'))
     return cb()
   }
-  debug('_transform %s', qry.url)
-  var me = this
-  var uri = qry.url
-  getETag(this.db, uri, function (er, etag) {
+  const uri = qry.url
+
+  debug('_transform %s', uri)
+
+  getETag(this.db, uri, (er, etag) => {
     if (er && !er.notFound) {
       return cb(er)
     }
@@ -369,10 +397,10 @@ MangerTransform.prototype._transform = function (qry, enc, cb) {
     if (!qry.force && qry.etag) {
       // To make sure only valid feeds get counted, we emit 'query'
       // events for cached feeds only.
-      me.emit('query', qry)
-      me.retrieve(qry, cb)
+      this.emit('query', qry)
+      this.retrieve(qry, cb)
     } else {
-      me.request(qry, cb)
+      this.request(qry, cb)
     }
   })
 }

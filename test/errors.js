@@ -21,7 +21,8 @@ test('queries and requests', function (t) {
     var wanted = [
       'invalid query',
       'getaddrinfo ENOTFOUND',
-      'invalid query'
+      'invalid query',
+      'invalid protocol'
     ]
     s.on('finish', function () {
       t.same(JSON.parse(buf), [])
@@ -35,6 +36,7 @@ test('queries and requests', function (t) {
     t.ok(s.write('abc'))
     t.ok(s.write('http://def'))
     t.ok(s.write('ghi'))
+    t.ok(s.write('feed://abc'))
     t.ok(s.write('http://def'))
     s.end()
   }
