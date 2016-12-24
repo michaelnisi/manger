@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "pretest": "standard",
-    "test": "NODE_TEST=1 tap test/*.js -b --cov",
+    "test": "tap test/*.js -b --cov",
     "posttest": "rm -rf /tmp/manger-[1-9]* "
   },
   "repository": {

@@ -1028,7 +1028,7 @@ Manger.prototype.remove = function (uri, cb) {
   return remove(this.db, uri, cb)
 }
 
-if (parseInt(process.env.NODE_TEST, 10) === 1) {
+if (process.mainModule.filename.match(/test/) !== null) {
   exports.Entries = Entries
   exports.Feeds = Feeds
   exports.Manger = Manger
