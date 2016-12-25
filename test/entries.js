@@ -1,28 +1,31 @@
 'use strict'
 
-var assert = require('assert')
-var common = require('./lib/common')
-var fs = require('fs')
-var manger = require('../')
-var nock = require('nock')
-var path = require('path')
-var stread = require('stread')
-var stream = require('readable-stream')
-var test = require('tap').test
-var url = require('url')
-var zlib = require('zlib')
+const assert = require('assert')
+const common = require('./lib/common')
+const debug = require('util').debuglog('manger')
+const fs = require('fs')
+const manger = require('../')
+const nock = require('nock')
+const path = require('path')
+const stread = require('stread')
+const stream = require('readable-stream')
+const test = require('tap').test
+const url = require('url')
+const zlib = require('zlib')
 
-test('all', function (t) {
+test('all', { skip: false }, (t) => {
   t.plan(8)
-  var scope = nock('http://just')
+
+  const scope = nock('http://just')
+
   function setup (zip) {
-    var headers = { 'content-type': 'text/xml; charset=UTF-8' }
+    const headers = { 'content-type': 'text/xml; charset=UTF-8' }
     if (zip) headers['content-encoding'] = 'gzip'
-    scope.get('/b2w').reply(200, function () {
-      var p = path.join(__dirname, 'data', 'b2w.xml')
-      var file = fs.createReadStream(p)
+    scope.get('/b2w').reply(200, () => {
+      const p = path.join(__dirname, 'data', 'b2w.xml')
+      const file = fs.createReadStream(p)
       if (zip) {
-        var gzip = zlib.createGzip()
+        const gzip = zlib.createGzip()
         return file.pipe(gzip)
       } else {
         return file
@@ -30,61 +33,60 @@ test('all', function (t) {
     }, headers)
     if (!zip) setup(true)
   }
+
   function go (times) {
     if (times === 0) return
-    var cache = common.freshManger()
-    var entries = cache.entries()
+    const cache = common.freshManger()
+    const entries = cache.entries()
     assert(entries instanceof stream.Readable, 'should be Readable')
-    var chunks = ''
-    entries.on('error', function (er) {
-      t.fail('should not ' + er)
-    })
-    entries.on('data', function (chunk) {
-      chunks += chunk
-    })
-    entries.once('end', function () {
-      var found = JSON.parse(chunks)
+    let chunks = ''
+    entries.on('error', (er) => { t.fail('should not ' + er) })
+    entries.on('data', (chunk) => { chunks += chunk })
+    entries.once('end', () => {
+      const found = JSON.parse(chunks)
       t.is(found.length, 150 * 2)
       t.is(cache.counter.itemCount, 1)
       go(--times)
     })
-    var uri = 'http://just/b2w'
+    const uri = 'http://just/b2w'
     t.ok(entries.write(uri))
     t.ok(entries.write(uri), 'should not hit server')
     entries.end()
   }
+
   setup()
   go(2)
 })
 
-test('time range', function (t) {
-  t.plan(5)
-  var scopes = []
-  var headers = { 'content-type': 'text/xml; charset=UTF-8' }
-  var strs = ['http://just/b2w', 'http://some/ddc']
-  strs.forEach(function (str) {
-    var uri = url.parse(str)
-    var name = uri.pathname
-    var host = 'http://' + uri.host
-    scopes.push(nock(host).get(name).reply(200, function () {
-      var p = path.join(__dirname, 'data', name + '.xml')
+test('time range', { skip: false }, (t) => {
+  const origins = ['http://just/b2w', 'http://some/ddc']
+  const headers = { 'content-type': 'text/xml; charset=UTF-8' }
+
+  const scopes = []
+
+  origins.forEach((origin) => {
+    const uri = url.parse(origin)
+    const name = uri.pathname
+    const host = 'http://' + uri.host
+
+    scopes.push(nock(host).get(name).reply(200, () => {
+      const p = path.join(__dirname, 'data', name + '.xml')
       return fs.createReadStream(p)
     }, headers))
   })
-  var db = common.freshDB()
+
+  const store = common.freshManger()
+
   function go (cb) {
-    var entries = new manger.Entries(db)
-    var chunks = ''
-    entries.on('error', function (er) {
-      throw er
-    })
-    entries.on('data', function (chunk) {
-      chunks += chunk
-    })
-    entries.on('end', function () {
-      cb(null, chunks)
-    })
-    var rawQueries = JSON.stringify([
+    const entries = store.entries()
+
+    let chunks = ''
+    entries.on('data', (chunk) => { chunks += chunk })
+    entries.on('end', () => { cb(null, chunks) })
+
+    // TODO: Investigate edge cases
+
+    const rawQueries = JSON.stringify([
       { url: 'http://just/b2w',
         since: new Date('Tue, 17 Dec 2013 22:00:00 GMT')
       },
@@ -92,26 +94,131 @@ test('time range', function (t) {
         since: new Date('Fri, 1 Nov 2013 11:29:00 -0700')
       }
     ])
-    var queries = manger.queries()
+    const queries = manger.queries()
     stread(rawQueries).pipe(queries)
     queries.pipe(entries)
   }
-  go(function (er, served) {
+
+  function handle (er, chunks, cb) {
     if (er) throw er
-    var found = JSON.parse(served)
-    t.is(found.length, 1, 'should be exclusive')
+    const found = JSON.parse(chunks)
+    found.forEach((entry) => { debug('*** %s', entry.title) })
+    t.is(found.length, 1, 'edge cases should be exclusive')
     t.is(found[0].title, '23: Morality 2.0')
-    scopes.forEach(function (scope) {
-      t.ok(scope.isDone())
-    })
-    go(function (er, cached) {
-      if (er) throw er
-      t.is(cached, served)
+    cb()
+  }
+
+  // Fresh and cached results should be similar.
+  go((er, fresh) => {
+    handle(er, fresh, () => {
+      go((er, cached) => {
+        handle(er, cached, () => {
+          scopes.forEach((scope) => {
+            t.ok(scope.isDone())
+          })
+          t.end()
+        })
+      })
     })
   })
 })
 
-test('teardown', function (t) {
+function read (entries, uri, cb) {
+  const found = []
+  entries.on('finish', () => {
+    cb(found)
+  })
+  entries.on('readable', () => {
+    let entry = null
+    while ((entry = entries.read()) !== null) {
+      found.push(entry)
+    }
+  })
+  entries.end(uri)
+}
+
+test('default date', { skip: false }, (t) => {
+  const origin = 'http://feeds.5by5.tv'
+  const scope = nock(origin)
+
+  scope.get('/b2w').reply(200, (req, body) => {
+    return [
+      '<rss><channel><title>Planets</title>',
+      '<item><title>Mercury</title><guid>123</guid></item>',
+      '</channel></rss>'
+    ].join('')
+  })
+
+  const store = common.freshManger({ objectMode: true })
+  const uri = `${origin}/b2w`
+
+  function go (cb) {
+    read(store.entries(), uri, (entries) => {
+      t.is(entries.length, 1)
+      const entry = entries[0]
+      t.is(entry.updated, 1)
+      t.ok(scope.isDone())
+      cb ? cb() : t.end()
+    })
+  }
+
+  go(go)
+})
+
+test('entry updating', { skip: false }, (t) => {
+  const origin = 'http://feeds.5by5.tv'
+  const scope = nock(origin)
+
+  function reply (title) {
+    scope.get('/b2w').reply(200, (req, body) => {
+      return [
+        '<rss><channel><title>Planets</title>',
+        '<item><title>Mercury</title><guid>123</guid></item>',
+        `<item><title>${title}</title><guid>456</guid></item>`,
+        '</channel></rss>'
+      ].join('')
+    })
+  }
+
+  reply('Venus')
+  reply('Earth')
+
+  const store = common.freshManger({ objectMode: true })
+  const uri = `${origin}/b2w`
+
+  read(store.entries(), uri, (entries) => {
+    const titles = (es) => { return es.map((e) => { return e.title }) }
+    const ids = (es) => { return es.map((e) => { return e.id }) }
+
+    t.same(titles(entries), ['Mercury', 'Venus'])
+    t.same(ids(entries), [
+      'c27dcc63514c1979cafced8d7dc319fa3fef9d71ddfc35232dbe35f6aa788a7c',
+      '39761d421b49c4d6f9e9fbd3e60bc83f04e23720b617718092b73acbe4923b9d'
+    ])
+
+    store.has(uri, (er) => {
+      if (er) throw er
+      store.flushCounter((er) => {
+        if (er) throw er
+        const update = store.update()
+        update.on('end', () => {
+          read(store.entries(), uri, (entries) => {
+            t.same(titles(entries), ['Earth', 'Mercury'])
+            t.same(ids(entries), [
+              '39761d421b49c4d6f9e9fbd3e60bc83f04e23720b617718092b73acbe4923b9d',
+              'c27dcc63514c1979cafced8d7dc319fa3fef9d71ddfc35232dbe35f6aa788a7c'
+            ])
+            t.ok(scope.isDone())
+            t.end()
+          })
+        })
+        update.resume()
+      })
+    })
+  })
+})
+
+test('teardown', (t) => {
   t.ok(!common.teardown())
   t.end()
 })

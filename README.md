@@ -45,7 +45,7 @@ A related resource of an `entry()`.
 
 ### html()
 
-An sanitized HTML `String()` with tags limited to: `'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'p', 'a', 'ul', 'ol', 'li', 'b', 'i', 'strong', 'em', 'code', 'br', 'div', 'pre'`.
+A sanitized HTML `String()` with a limited set of tags: `'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'p', 'a', 'ul', 'ol', 'li', 'b', 'i', 'strong', 'em', 'code', 'br', 'div', 'pre'`.
 
 ### entry()
 
@@ -55,7 +55,7 @@ An individual entry.
 - `enclosure` `enclosure() | void()`
 - `duration` `Number() | null` The value of the `<itunes:duration>` tag in seconds or `null`.
 - `feed` `str()`
-- `id` `str()`
+- `id` `String()` A globally unique, not the original, identifier for this entry.
 - `image` `str()`
 - `link` `str()`
 - `subtitle` `str()`
@@ -168,7 +168,7 @@ The **manger** module decorates the exported `Manger` constructor with two conve
 
 ### manger.query(url, since, etag, force)
 
-A failable factory function returning a valid [`query()`](#query) or `void()`.
+A failable factory function returning a valid [`query()`](#query) or `null`.
 
 ### manger.queries()
 
@@ -189,7 +189,7 @@ Where `"since"` can be anything `Date()` is able to parse.
 
 #### Event: 'warn'
 
-To make piping easier—by not breaking pipes—the queries stream emits a `'warning'` event instead of an `'error'` event if it encounters an invalid query. General stream errors, of course, are still emitted nevertheless.
+To make piping easier, not breaking pipes, the queries stream emits a `'warning'` event instead of an `'error'` event if it encounters an invalid query. General stream errors, of course, are still emitted nevertheless.
 
 ## Installation
 

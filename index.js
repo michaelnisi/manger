@@ -188,6 +188,8 @@ function failureKey (method, uri) {
 }
 
 MangerTransform.prototype._request = function (qry, cb) {
+  debug('miss: %s', qry.url)
+
   const opts = qry.request()
 
   const [er, mod] = this.httpModule(opts.protocol)
@@ -280,7 +282,6 @@ MangerTransform.prototype._request = function (qry, cb) {
   }
 
   let req = mod.get(opts, onResponse)
-  debug(opts)
 
   req.once('error', onRequestError)
 }
@@ -368,9 +369,18 @@ MangerTransform.prototype.request = function (qry, cb) {
   }
 }
 
+// TODO: Move into query module
+
 function processQuery (me, qry) {
-  if (qry instanceof Buffer) qry = me.decoder.write(qry)
-  if (typeof qry === 'string') qry = query(qry)
+  if (!(qry instanceof query.Query)) {
+    if (!qry) return
+    if (qry instanceof Buffer) qry = me.decoder.write(qry)
+    if (typeof qry === 'string') {
+      qry = query(qry)
+    } else {
+      qry = query(qry.url, qry.since, qry.etag, qry.force)
+    }
+  }
   if (qry) {
     if (me.force) qry.force = true
     qry.url = me.redirects.get(qry.url) || qry.url
@@ -385,8 +395,6 @@ MangerTransform.prototype._transform = function (qry, enc, cb) {
     return cb()
   }
   const uri = qry.url
-
-  debug('_transform %s', uri)
 
   getETag(this.db, uri, (er, etag) => {
     if (er && !er.notFound) {
@@ -440,7 +448,6 @@ MangerTransform.prototype.parse = function (qry, res, cb) {
 
   // It still escapes me, why http.IncomingMessage wouldn't provide the URL of its
   // originating request. Anyways, just pass the query to provide it.
-  debug('parsing %s', uri)
 
   const me = this
 
@@ -449,11 +456,14 @@ MangerTransform.prototype.parse = function (qry, res, cb) {
 
   var ok = true
 
+  // TODO: Validate feed
+
   function onFeed (feed) {
     feed.feed = uri
-    feed.updated = time(feed)
-    var k = schema.feed(uri)
-    var v = JSON.stringify(feed)
+    feed.updated = Math.max(time(feed), 1)
+
+    const k = schema.feed(uri)
+    const v = JSON.stringify(feed)
     batch.put(k, v)
     if (!ok) {
       rest.push(feed)
@@ -462,12 +472,21 @@ MangerTransform.prototype.parse = function (qry, res, cb) {
     }
   }
 
+  // TODO: Validate entry
+
   function onEntry (entry) {
     entry.feed = uri
-    entry.updated = time(entry)
+
+    entry.updated = Math.max(time(entry), 1)
     entry.summary = strings.html(entry.summary)
     entry.duration = strings.duration(entry.duration)
-    var k = schema.entry(uri, entry.updated)
+    entry.id = strings.entryID(entry)
+
+    if (typeof entry.id !== 'string') {
+      return
+    }
+
+    var k = schema.entry(uri, entry.updated, entry.id)
     var v = JSON.stringify(entry)
     batch.put(k, v)
     if (!ok) {
@@ -589,7 +608,8 @@ function Feeds (db, opts) {
 util.inherits(Feeds, MangerTransform)
 
 Feeds.prototype.retrieve = function (qry, cb) {
-  // debug('hit: %s', qry.url)
+  debug('hit: %s', qry.url)
+
   var me = this
   var db = this.db
   var uri = qry.url
@@ -617,18 +637,20 @@ function Entries (db, opts) {
 util.inherits(Entries, MangerTransform)
 
 Entries.prototype.retrieve = function (qry, cb) {
-  var me = this
-  var opts = schema.entries(qry.url, qry.since, true)
-  var values = this.db.createValueStream(opts)
-  var ok = true
-  function use () {
+  debug('hit: %s', qry.url)
+
+  let opts = schema.entries(qry.url, qry.since, true)
+  let values = this.db.createValueStream(opts)
+  let ok = true
+
+  const use = () => {
     if (!ok || !values) return
-    var chunk
+    let chunk
     while (ok && (chunk = values.read()) !== null) {
-      ok = me.use(chunk)
+      ok = this.use(chunk)
     }
     if (!ok) {
-      me.once('drain', function () {
+      this.once('drain', () => {
         ok = true
         use()
       })
@@ -640,12 +662,11 @@ Entries.prototype.retrieve = function (qry, cb) {
     values.removeListener('error', onerror)
     values.removeListener('end', onend)
     values = null
-    me = null
     cb(er)
     cb = null
   }
   function onerror (er) {
-    var error = new Error('retrieve error: ' + er.message)
+    let error = new Error('retrieve error: ' + er.message)
     onend(error)
   }
   values.on('readable', use)

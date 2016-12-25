@@ -34,8 +34,8 @@ test('entry', function (t) {
   t.throws(function () { f('http://abc.de/', new Date()) })
   var ts = Date.now()
   var wanted = [
-    ['manger', ['entry', 'http://abc.de/', 0]],
-    ['manger', ['entry', 'http://abc.de/', ts]]
+    ['manger', ['entry', 'http://abc.de/', 0, null]],
+    ['manger', ['entry', 'http://abc.de/', ts, null]]
   ]
   var found = [
     f('http://abc.de'),
@@ -47,12 +47,12 @@ test('entry', function (t) {
 test('entries', function (t) {
   var f = schema.entries
   var wanted = [
-    { gt: ['manger', ['entry', 'http://abc.de/', 0]],
-      lte: ['manger', ['entry', 'http://abc.de/', Infinity]],
+    { gt: ['manger', ['entry', 'http://abc.de/', 0, null]],
+      lte: ['manger', ['entry', 'http://abc.de/', Infinity, null]],
       fillCache: false
     },
-    { gt: ['manger', ['entry', 'http://abc.de/', 3600]],
-      lte: ['manger', ['entry', 'http://abc.de/', Infinity]],
+    { gt: ['manger', ['entry', 'http://abc.de/', 3600, null]],
+      lte: ['manger', ['entry', 'http://abc.de/', Infinity, null]],
       fillCache: true
     }
   ]

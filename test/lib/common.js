@@ -22,10 +22,10 @@ function freshDB () {
   return db
 }
 
-function freshManger () {
+function freshManger (opts) {
   assert(!teardown())
   var name = freshName()
-  var svc = manger(name)
+  var svc = manger(name, opts)
   db = svc.db
   return svc
 }

@@ -3,6 +3,34 @@
 const strings = require('../lib/strings')
 const test = require('tap').test
 
+test('entry identity', (t) => {
+  const f = strings.entryID
+  const wanted = [
+    null,
+    null,
+    null,
+    null,
+    null,
+    'c0c56026401e18150bad716534a6d5f2a8f6ef499e0c7ac23ae472dd1133709c',
+    'c0c56026401e18150bad716534a6d5f2a8f6ef499e0c7ac23ae472dd1133709c',
+    'c0c56026401e18150bad716534a6d5f2a8f6ef499e0c7ac23ae472dd1133709c'
+  ]
+  const found = [
+    f(null),
+    f(undefined),
+    f({}),
+    f({ feed: 'https://example.com' }),
+    f({ id: 'abc' }),
+    f({ feed: 'https://example.com', id: 'abc' }),
+    f({ feed: 'https://example.com', link: 'abc' }),
+    f({ feed: 'https://example.com', title: 'abc' })
+  ]
+  t.plan(wanted.length)
+  wanted.forEach((it) => {
+    t.same(found.shift(), it)
+  })
+})
+
 test('duration', (t) => {
   const f = strings.duration
   const wanted = [

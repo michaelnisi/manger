@@ -192,7 +192,7 @@ test('redirection of cached', { skip: false }, (t) => {
   s.end(q)
 })
 
-test('HEAD 404', (t) => {
+test('HEAD 404', { skip: false }, (t) => {
   const scope = nock('http://hello')
   const headers = {
     'content-type': 'text/xml; charset=UTF-8',
@@ -241,7 +241,7 @@ test('HEAD 404', (t) => {
   feeds.end()
 })
 
-test('HEAD not found', (t) => {
+test('HEAD not found', { skip: false }, (t) => {
   const scope = nock('http://hello')
   const headers = {
     'content-type': 'text/xml; charset=UTF-8',
