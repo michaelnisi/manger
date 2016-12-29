@@ -192,8 +192,8 @@ test('entry updating', { skip: false }, (t) => {
 
     t.same(titles(entries), ['Mercury', 'Venus'])
     t.same(ids(entries), [
-      'c27dcc63514c1979cafced8d7dc319fa3fef9d71ddfc35232dbe35f6aa788a7c',
-      '39761d421b49c4d6f9e9fbd3e60bc83f04e23720b617718092b73acbe4923b9d'
+      '5d1f67733a85925f1ad4ef0100276daabef0e412',
+      '80f78b85676487ec1fea35e957b2d091cb2287cb'
     ])
 
     store.has(uri, (er) => {
@@ -203,10 +203,10 @@ test('entry updating', { skip: false }, (t) => {
         const update = store.update()
         update.on('end', () => {
           read(store.entries(), uri, (entries) => {
-            t.same(titles(entries), ['Earth', 'Mercury'])
+            t.same(titles(entries), ['Mercury', 'Earth'])
             t.same(ids(entries), [
-              '39761d421b49c4d6f9e9fbd3e60bc83f04e23720b617718092b73acbe4923b9d',
-              'c27dcc63514c1979cafced8d7dc319fa3fef9d71ddfc35232dbe35f6aa788a7c'
+              '5d1f67733a85925f1ad4ef0100276daabef0e412',
+              '80f78b85676487ec1fea35e957b2d091cb2287cb'
             ])
             t.ok(scope.isDone())
             t.end()
