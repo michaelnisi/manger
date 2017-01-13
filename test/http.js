@@ -10,7 +10,7 @@ const nock = require('nock')
 const path = require('path')
 const test = require('tap').test
 
-test('socket destruction', { skip: false }, (t) => {
+test('socket destruction', { skip: false }, t => {
   nock('http://abc.de').get('/').reply(function () {
     this.req.destroy()
   })
@@ -87,7 +87,7 @@ test('ETag', { skip: false }, (t) => {
 
   t.plan(10)
 
-  feeds.on('error', (er) => { t.fail('should not emit ' + er) })
+  feeds.on('error', er => { t.fail('should not emit ' + er) })
   let chunk
   let chunks = ''
   feeds.on('readable', () => {
@@ -100,17 +100,17 @@ test('ETag', { skip: false }, (t) => {
     // Forced queries only emit feeds that actually got updated.
     t.is(found.length, 2)
     const first = found[0]
-    found.forEach((feed) => { t.same(first, feed) })
+    found.forEach(feed => { t.same(first, feed) })
     t.ok(scope.isDone())
   })
   const uri = 'http://feeds.5by5.tv/b2w'
   const qry = manger.query(uri, null, null, true)
   const queries = [uri, uri, qry, qry]
-  queries.forEach((q) => { t.ok(feeds.write(q)) })
+  queries.forEach(q => { t.ok(feeds.write(q)) })
   feeds.end()
 })
 
-test('redirection', { skip: false }, (t) => {
+test('permanent redirection', { skip: false }, (t) => {
   const headers = {
     'content-type': 'text/xml; charset=UTF-8',
     'ETag': '55346232-18151',
@@ -120,35 +120,99 @@ test('redirection', { skip: false }, (t) => {
     nock('http://just'),
     nock('http://some')
   ]
-  nock('http://just').get('/b2w').reply(301, function () {
-    t.pass(301)
+  scopes[0].get('/b2w').reply(301, () => {
   }, headers)
-  nock('http://some').get('/ddc').reply(200, function () {
-    t.pass(200)
+  scopes[1].get('/ddc').reply(200, () => {
+    const p = path.join(__dirname, 'data', 'ddc.xml')
+    return fs.createReadStream(p)
+  })
+
+  function run (s, cb) {
+    let buf = ''
+    s.on('data', chunk => { buf += chunk })
+    s.on('end', () => {
+      JSON.parse(buf).forEach((item) => {
+        t.is(item.originalURL, 'http://just/b2w')
+        t.is(item.url, 'http://some/ddc')
+      })
+      cb()
+    })
+    s.end('http://just/b2w')
+  }
+
+  function go (checks) {
+    const check = checks.pop()
+    if (!check) {
+      scopes.forEach(scope => {
+        t.ok(scope.isDone(), 'scope should be done')
+      })
+      return t.end()
+    }
+    run(check, () => { go(checks) })
+  }
+
+  const cache = common.freshManger()
+  go([cache.feeds(), cache.entries()])
+})
+
+test('temporary redirection', { skip: false }, t => {
+  const headers = {
+    'content-type': 'text/xml; charset=UTF-8',
+    'ETag': '55346232-18151',
+    'Location': 'http://some/ddc'
+  }
+  const scopes = [
+    nock('http://just'),
+    nock('http://some')
+  ]
+  scopes[0].get('/b2w').reply(302, () => {
+  }, headers)
+  scopes[1].get('/ddc').reply(200, () => {
     const p = path.join(__dirname, 'data', 'ddc.xml')
     return fs.createReadStream(p)
   })
 
   const cache = common.freshManger()
-  const x = Math.random() > 0.5
-  const s = x ? cache.feeds() : cache.entries()
+  const uri = 'http://just/b2w'
 
-  t.plan(4)
-
-  let buf = ''
-  s.on('data', (chunk) => {
-    buf += chunk
-  })
-  s.on('end', () => {
-    JSON.parse(buf)
-    scopes.forEach((scope) => {
-      t.ok(scope.isDone(), 'scope should be done')
+  function run (s, cb) {
+    let buf = ''
+    s.on('data', chunk => { buf += chunk })
+    s.on('error', er => { t.fail() })
+    s.on('end', () => {
+      JSON.parse(buf).forEach(item => {
+        t.is(item.originalURL, uri)
+        t.is(item.url, uri)
+      })
+      const feeds = cache.list()
+      const uris = []
+      feeds.on('data', (uri) => {
+        uris.push(uri)
+      })
+      feeds.on('end', () => {
+        t.is(uris.length, 1)
+        t.is(uris[0], uri)
+        cb()
+      })
     })
-  })
-  s.end('http://just/b2w')
+    s.end(uri)
+  }
+
+  function go (checks) {
+    const check = checks.pop()
+    if (!check) {
+      scopes.forEach(scope => {
+        t.ok(scope.isDone(), 'scope should be done')
+      })
+      return t.end()
+    }
+    run(check, () => { go(checks) })
+  }
+
+  go([cache.entries(), cache.feeds()])
 })
 
-test('redirection of cached', { skip: false }, (t) => {
+test('redirection of cached', { skip: false }, t => {
   const scopes = [
     nock('http://just'),
     nock('http://some')
@@ -182,7 +246,7 @@ test('redirection of cached', { skip: false }, (t) => {
   })
   s.on('end', () => {
     JSON.parse(buf)
-    scopes.forEach((scope) => {
+    scopes.forEach(scope => {
       t.ok(scope.isDone(), 'scope should be done')
     })
   })
@@ -192,7 +256,7 @@ test('redirection of cached', { skip: false }, (t) => {
   s.end(q)
 })
 
-test('HEAD 404', { skip: false }, (t) => {
+test('HEAD 404', { skip: false }, t => {
   const scope = nock('http://hello')
   const headers = {
     'content-type': 'text/xml; charset=UTF-8',
@@ -213,7 +277,7 @@ test('HEAD 404', { skip: false }, (t) => {
 
   const store = common.freshManger()
   const feeds = store.feeds()
-  feeds.on('error', (er) => {
+  feeds.on('error', er => {
     t.is(er.message, 'quaint HTTP status: 404 from hello')
   })
   let chunks = ''
@@ -241,7 +305,7 @@ test('HEAD 404', { skip: false }, (t) => {
   feeds.end()
 })
 
-test('HEAD not found', { skip: false }, (t) => {
+test('HEAD not found', { skip: false }, t => {
   const scope = nock('http://hello')
   const headers = {
     'content-type': 'text/xml; charset=UTF-8',
@@ -256,7 +320,7 @@ test('HEAD not found', { skip: false }, (t) => {
 
   const store = common.freshManger()
   const feeds = store.feeds()
-  feeds.on('error', (er) => {
+  feeds.on('error', er => {
     t.is(er.message, 'getaddrinfo ENOTFOUND hello hello:80')
   })
   let chunks = ''
@@ -282,7 +346,7 @@ test('HEAD not found', { skip: false }, (t) => {
   feeds.end()
 })
 
-test('teardown', (t) => {
+test('teardown', t => {
   t.ok(!common.teardown())
   t.end()
 })

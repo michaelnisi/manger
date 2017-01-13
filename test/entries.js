@@ -94,7 +94,7 @@ test('time range', { skip: false }, (t) => {
         since: new Date('Fri, 1 Nov 2013 11:29:00 -0700')
       }
     ])
-    const queries = manger.queries()
+    const queries = manger.Queries()
     stread(rawQueries).pipe(queries)
     queries.pipe(entries)
   }

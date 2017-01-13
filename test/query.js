@@ -101,6 +101,24 @@ test('request', (t) => {
   })
 })
 
+test('redirect', t => {
+  // TODO: Add more tests
+  const found = [
+    query('http://abc.de').redirect(301, 'http://fgh.ij')
+  ]
+  const wanted = [
+    query('http://fgh.ij', 0, null, false, 301, 1, 'http://abc.de')
+  ]
+  // --
+  for (let it of wanted) {
+    t.same(found.shift(), it)
+  }
+  t.throws(() => { query('http://abc.de').redirect() })
+  t.throws(() => { query('http://abc.de').redirect(301) })
+  t.throws(() => { query('http://abc.de').redirect('hello', 'there') })
+  t.end()
+})
+
 test('shield queries', (t) => {
   function go (i, o) {
     const input = i.shift()

@@ -3,19 +3,17 @@
 
 # manger - cache feeds
 
-The **manger** [Node](http://nodejs.org/) package provides caching for RSS and Atom formatted XML feeds. It provides an interface to query entries by feed and time.
+The **manger** [Node](http://nodejs.org/) package provides caching for RSS and Atom formatted XML feeds, it implements an interface to query entries by feed and time.
 
 ## Types
 
 ### void()
 
-`null | undefined`
+`null | undefined` Absence of any object value, intentional or not.
 
 ### str()
 
-An optional [`String()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String).
-
-`String() | void()`
+`String() | void()` An optional [`String()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String).
 
 ### feed()
 
@@ -23,17 +21,18 @@ One metadata object per XML feed.
 
 - `author` `str()`
 - `copyright` `str()`
-- `feed` `str()`
 - `id` `str()`
 - `image` `str()`
 - `language` `str()`
 - `link` `str()`
+- `originalURL` `str()`
 - `payment` `str()`
 - `subtitle` `str()`
 - `summary` `str()`
 - `title` `str()`
 - `ttl` `str()`
 - `updated` `Number()`
+- `url` `str()`
 
 ### enclosure()
 
@@ -52,16 +51,17 @@ A sanitized HTML `String()` with a limited set of tags: `'h1', 'h2', 'h3', 'h4',
 An individual entry.
 
 - `author` `str()`
-- `enclosure` `enclosure() | void()`
 - `duration` `Number() | null` The value of the `<itunes:duration>` tag in seconds or `null`.
-- `feed` `str()`
+- `enclosure` `enclosure() | void()`
 - `id` `String()` A globally unique, not the original, identifier for this entry.
 - `image` `str()`
 - `link` `str()`
+- `originalURL` `str()` The URL of this entry’s parent feed.
 - `subtitle` `str()`
 - `summary` `html() | void()`
 - `title` `str()`
 - `updated` `str()`
+- `url` `str()` The URL of this entry’s parent feed.
 
 ### query()
 
@@ -72,26 +72,32 @@ A query to get a feed or entries of a feed in a time range between `Date.now()` 
 - `etag` `String() | void()` An [entity tag](http://en.wikipedia.org/wiki/HTTP_ETag)
 - `force` [`Boolean()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Boolean)` | false` Force update ignoring cache
 
+### nop()
+
+`function () {}` No Operation.
+
 ### opts()
 
 Options for a `Manger` instance.
 
-- `cacheSize` [`Number()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number) `| 8 * 1024 * 1024` Passed to [levelup()](https://github.com/Level/levelup#ctor)
-- `objectMode` `Boolean() | false` Provide objects instead of buffers
+- `cacheSize = 16 * 1024 * 1024` [LevelDB](https://github.com/google/leveldb) cache size for uncompressed blocks.
+- `counterMax = 500` Limits the items in the ranks counter.
+- `failures = { set: nop, get: nop, has: nop }` LRU cache for failures.
+- `force = false` A flag to bypass cached data entirely.
+- `highWaterMark` Buffer level when `stream.write()` starts returning `false`.
+- `isEntry = function (entry) { return true }` A function to validate entries.
+- `isFeed = function (feed) { return true }` A function to validate feeds.
+- `objectMode = false` Read `Object()` instead of `Buffer()`.
+- `redirects = { set: nop, get: nop, has: nop }` LRU cache for redirects.
 
 ## Exports
 
-### manger(name, opts)
-
-- `name` `String()` The name of the file system directory for the database
-- `opts` `opts()`
+### manger(name, opts())
 
 The **manger** module exports a single function that returns a new `cache` object (an instance of `Manger`). To access the `Manger` class `require('manger')`.
 
-```js
-const manger = require('manger')
-const cache = manger('/tmp/manger.db')
-```
+- `name` `String()` The name of the file system directory for the database
+- `opts` `opts()`
 
 If `opts` has `objectMode` set to `true`, results are read as `Object` types, instead of [`Buffer`](https://nodejs.org/api/buffer.html), moulding valid [JSON](http://json.org/).
 
@@ -99,11 +105,18 @@ If `opts` has `objectMode` set to `true`, results are read as `Object` types, in
 
 The distinction between feed and entries might be unclear. A feed models the metadata of an RSS or Atom feed (title, author, published, etc.), while entries are the actual items in the feed. These are detached to not repeatedly transmit feed metadata—after all **manger** tries to reduce round-trips.
 
+Let’s create a **manger** instance named `cache` to document the API:
+
+```js
+const manger = require('manger')
+const cache = manger('/tmp/manger.db')
+```
+
 ### cache.entries()
 
 A [Transform](http://nodejs.org/api/stream.html#stream_class_stream_transform) stream that transforms queries or URLs to entries.
 
-- `write(Buffer() | String() | query())`
+- `write(Buffer() | String() | Object() | query())`
 - `read()` `Buffer() | entry()`
 
 ### cache.feeds()
@@ -111,7 +124,7 @@ A [Transform](http://nodejs.org/api/stream.html#stream_class_stream_transform) s
 A stream that transforms queries or URL strings to feeds.
 
 - `write(query() | String())`
-- `read()` `Buffer() | String() | feed()`
+- `read()` `Buffer() | String() | Object() | feed()`
 
 ### cache.list()
 
@@ -125,11 +138,15 @@ Updates all ranked feeds and returns a stream that emits feed URLs of updated fe
 
 - `read()` `str()`
 
-### cache.ranks()
+### cache.ranks(limit)
 
 A stream of URLs sorted by rank (highest first).
 
-- `read()` `Buffer() | String() | null`
+- `limit` `Number()` Optionally, limit the number of URLs.
+
+This stream lets you:
+
+- `read()` `Buffer() | str()`
 
 ### cache.resetRanks(cb)
 

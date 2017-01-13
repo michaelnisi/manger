@@ -19,11 +19,11 @@ test('entry identity', (t) => {
     f(null),
     f(undefined),
     f({}),
-    f({ feed: 'https://example.com' }),
+    f({ url: 'https://example.com' }),
     f({ id: 'abc' }),
-    f({ feed: 'https://example.com', id: 'abc' }),
-    f({ feed: 'https://example.com', link: 'abc' }),
-    f({ feed: 'https://example.com', title: 'abc' })
+    f({ url: 'https://example.com', id: 'abc' }),
+    f({ url: 'https://example.com', link: 'abc' }),
+    f({ url: 'https://example.com', title: 'abc' })
   ]
   t.plan(wanted.length)
   wanted.forEach((it) => {
@@ -88,7 +88,5 @@ test('html', (t) => {
     f('<br>self closing<br>')
   ]
   t.plan(wanted.length)
-  wanted.forEach((it) => {
-    t.same(found.shift(), it)
-  })
+  wanted.forEach(item => { t.same(found.shift(), item) })
 })

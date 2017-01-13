@@ -2,9 +2,7 @@
 
 // manger - cache feeds
 
-exports = module.exports = function (name, opts) {
-  return new Manger(name, opts)
-}
+exports = module.exports = Manger
 
 const assert = require('assert')
 const bytewise = require('bytewise')
@@ -27,34 +25,47 @@ const zlib = require('zlib')
 
 exports.Entries = Entries
 exports.Feeds = Feeds
-exports.Manger = Manger
-exports.MangerTransform = MangerTransform
-
+exports.Opts = Opts
+exports.Queries = query.Queries
 exports.query = query
-exports.queries = (opts) => {
-  return new query.Queries(opts)
-}
 
 function nop () {}
 
-function Opts (opts) {
-  opts = opts || Object.create(null)
-  this.cacheSize = opts.cacheSize || 8 * 1024 * 1024
-  this.counterMax = opts.counterMax || 500
-  this.failures = opts.failures || { set: nop, get: nop, has: nop }
-  this.force = opts.force || false
-  this.highWaterMark = opts.highWaterMark
-  this.objectMode = opts.objectMode || false
-  this.redirects = opts.redirects || { set: nop, get: nop, has: nop }
+function Opts (
+  cacheSize = 16 * 1024 * 1024,
+  counterMax = 500,
+  failures = { set: nop, get: nop, has: nop },
+  force = false,
+  highWaterMark,
+  isEntry = function (entry) { return true },
+  isFeed = function (feed) { return true },
+  objectMode = false,
+  redirects = { set: nop, get: nop, has: nop }
+) {
+  this.cacheSize = cacheSize
+  this.counterMax = counterMax
+  this.failures = failures
+  this.force = force
+  this.highWaterMark = highWaterMark
+  this.isEntry = isEntry
+  this.isFeed = isFeed
+  this.objectMode = objectMode
+  this.redirects = redirects
 }
 
-// A new copy of options with default properties if required.
-function defaults (opts) {
-  return new Opts(opts)
-}
-
-function extend (origin, add) {
-  return util._extend(origin, add)
+function defaults (opts = Object.create(null)) {
+  if (opts instanceof Opts) return opts
+  return new Opts(
+    opts.cacheSize,
+    opts.counterMax,
+    opts.failures,
+    opts.force,
+    opts.highWaterMark,
+    opts.isEntry,
+    opts.isFeed,
+    opts.objectMode,
+    opts.redirects
+  )
 }
 
 // Abstract base class for Feeds and Entries.
@@ -63,44 +74,68 @@ function MangerTransform (db, opts) {
     return new MangerTransform(db, opts)
   }
 
-  opts = defaults(opts)
+  const o = defaults(opts)
 
-  stream.Transform.call(this, db, { highWaterMark: opts.highWaterMark })
+  stream.Transform.call(this, db, { highWaterMark: o.highWaterMark })
 
-  this.counterMax = opts.counterMax
-  this.failures = opts.failures
-  this.force = opts.force
-  this.redirects = opts.redirects
+  this.counterMax = o.counterMax
+  this.failures = o.failures
+  this.force = o.force
+  this.isEntry = o.isEntry
+  this.isFeed = o.isFeed
+  this.redirects = o.redirects
+  this._readableState.objectMode = o.objectMode
 
-  this._readableState.objectMode = opts.objectMode
   this._writableState.objectMode = true
   this.db = db
-  this.decoder = new stringDecoder.StringDecoder()
+  this.decoder = new stringDecoder.StringDecoder('utf8')
   this.state = 0
 }
 util.inherits(MangerTransform, stream.Transform)
 
 MangerTransform.prototype._flush = function (cb) {
   if (!this._readableState.objectMode) {
-    var chunk = this.state === 0 ? '[]' : ']'
+    const chunk = this.state === 0 ? '[]' : ']'
     this.push(chunk)
   }
   this.failures = null
   this.redirects = null
   this.db = null
   this.decoder = null
-  cb()
+  if (cb) cb()
 }
 
-// The data we try to parse comes from within our own system, should
-// it be corrupt and thus JSON failing to parse it, we better crash.
-MangerTransform.prototype.use = function (chunk) { // HOT
-  var it
-  var obj = typeof chunk === 'object'
+// A central method to push data.
+//
+// Always go through here, never push directly!
+//
+// - chunk Buffer() | Object() The chunk to be written.
+// - qry Query() The current query, passed to enable us to deal with redirects.
+MangerTransform.prototype.use = function (chunk, qry) {
+  this.emit('query', qry)
+
+  const uri = qry.uri()
+  const originalURL = qry.originalURL
+
+  // The data, we’re trying to parse here, comes from within our own system,
+  // should it be corrupt and thus JSON failing to parse it, we better crash.
+
+  let it
+  let obj = typeof chunk === 'object'
   if (this._readableState.objectMode) {
     it = obj ? chunk : JSON.parse(chunk)
+    it.feed = uri
+    it.originalURL = originalURL
   } else {
-    var chars = ['[', ',']
+    if (originalURL) {
+      if (!obj) {
+        obj = true
+        chunk = JSON.parse(chunk)
+        chunk.feed = uri
+        chunk.originalURL = originalURL
+      }
+    }
+    const chars = ['[', ',']
     it = chars[this.state] + (obj ? JSON.stringify(chunk) : chunk)
     if (this.state === 0) this.state = 1
   }
@@ -108,8 +143,8 @@ MangerTransform.prototype.use = function (chunk) { // HOT
 }
 
 function sameEtag (qry, res) {
-  var a = qry.etag
-  var b = res.headers['etag']
+  const a = qry.etag
+  const b = res.headers['etag']
   return !!a && !!b && a === b
 }
 
@@ -124,14 +159,14 @@ MangerTransform.prototype.httpModule = function (name) {
 }
 
 MangerTransform.prototype.head = function (qry, cb) {
+  debug('HEAD: %s', qry.url)
+
   const opts = qry.request('HEAD')
 
   const [er, mod] = this.httpModule(opts.protocol)
-  if (er) {
-    return cb(er)
-  }
+  if (er) { return cb ? cb(er) : null }
 
-  let headResponse = (res) => {
+  function headResponse (res) {
     function next (er, res) {
       res.removeListener('error', responseError)
       res.removeListener('end', responseEnd)
@@ -146,18 +181,14 @@ MangerTransform.prototype.head = function (qry, cb) {
     res.once('end', responseEnd)
     res.once('error', responseError)
 
-    res.resume() // to dismiss body
+    res.resume() // to dismiss eventual body
   }
 
   function done (er, res) {
-    req.removeListener('error', requestError)
     req.removeListener('aborted', requestAborted)
-    req = null
-
-    headResponse = nop
-
-    cb(er, res)
-    cb = null
+    req.removeListener('error', requestError)
+    req.removeListener('response', headResponse)
+    if (cb) cb(er, res)
   }
 
   let req = mod.request(opts, headResponse)
@@ -187,31 +218,37 @@ function failureKey (method, uri) {
   return method + '-' + uri
 }
 
+// A redirect consisting of HTTP status code and new URL.
+function Redirect (code, url) {
+  this.code = code
+  this.url = url
+}
+
 MangerTransform.prototype._request = function (qry, cb) {
-  debug('miss: %s', qry.url)
+  debug('GET: %s', qry.url)
 
   const opts = qry.request()
 
   const [er, mod] = this.httpModule(opts.protocol)
   if (er) {
     this.emit('error', er)
-    return cb()
+    return cb ? cb() : null
   }
 
-  let me = this
+  function removeListeners () {
+    req.removeListener('error', onRequestError)
+    req.removeListener('response', onResponse)
+    onParse = onRemove = onRemoveAfterRedirect = null
+  }
 
-  function done (er) {
+  const done = (er) => {
     // The `notFound` property was set by levelup, marking this error irrelevant.
     if (er && !er.notFound) {
       er.url = qry.url
-      me.emit('error', er)
+      this.emit('error', er)
     }
-
-    req.removeListener('error', onRequestError)
-    cb()
-
-    me = req = cb = null
-    onResponse = onParse = onRemove = onRemoveAfterRedirect = nop
+    removeListeners()
+    if (cb) cb()
   }
 
   let onParse = function (er) {
@@ -222,61 +259,67 @@ MangerTransform.prototype._request = function (qry, cb) {
     done(er)
   }
 
+  // TODO: Evaluate if this is necessary
   let onRemoveAfterRedirect // defined later, so we can cleanup its scope
 
-  let onResponse = function (res) {
+  const onResponse = (res) => {
     const h = headary(res)
+
     if (h.ok) {
-      return me.parse(qry, res, onParse)
+      return this.parse(qry, res, onParse)
     }
 
-    res.resume() // to dismiss eventual data
+    res.resume() // to dismiss body
 
     if (h.message) {
       const er = new Error(h.message)
       const key = failureKey('GET', qry.url)
-      me.failures.set(key, h.message)
-      done(er)
-    } else {
-      if (h.url) {
-        debug(`redirecting to ${h.url}`)
-        me.redirects.set(qry.url, h.url)
-        let nq = qry.clone(h.url)
-        if (h.permanent) {
-          onRemoveAfterRedirect = function (er) {
-            if (er && !er.notFound) me.emit('error', er)
-            req.removeListener('error', onRequestError)
-            me.request(nq, cb)
-            nq = me = req = cb = null
-          }
-          remove(me.db, qry.url, onRemoveAfterRedirect)
-        } else {
-          req.removeListener('error', onRequestError)
-          me.request(nq, cb)
-          nq = me = req = cb = null
-        }
-      } else if (h.permanent) {
-        remove(me.db, qry.url, onRemove)
-      } else {
-        req.removeListener('error', onRequestError)
-        me.retrieve(qry, cb)
-        me = req = cb = null
+      this.failures.set(key, h.message)
+      return done(er)
+    }
+
+    if (h.url) {
+      debug('redirecting GET %s to %s', qry.url, h.url)
+
+      const code = h.permanent ? 301 : 302
+      const nq = qry.redirect(code, h.url)
+      if (!nq) {
+        return done(new Error('too many redirects'))
       }
+
+      this.redirects.set(nq.originalURL, new Redirect(nq.code, nq.url))
+
+      if (h.permanent) { // permanent redirect
+        onRemoveAfterRedirect = (er) => {
+          if (er && !er.notFound) this.emit('error', er)
+          removeListeners()
+          this.request(nq, cb)
+        }
+        return remove(this.db, qry.url, onRemoveAfterRedirect)
+      } else { // temporary redirect
+        removeListeners()
+        return this.request(nq, cb)
+      }
+    }
+
+    if (h.permanent) { // gone
+      return remove(this.db, qry.url, onRemove)
+    } else {
+      removeListeners()
+      return this.retrieve(qry, cb)
     }
   }
 
-  function onRequestError (er) {
+  const onRequestError = (er) => {
     debug(er)
     req.abort()
 
     const key = failureKey('GET', qry.url)
-    me.failures.set(key, er.message)
+    this.failures.set(key, er.message)
 
     const error = new Error(er.message)
     error.code = er.code
     error.url = qry.url
-
-    onResponse = onParse = onRemove = onRemoveAfterRedirect = nop
 
     done(er)
   }
@@ -291,26 +334,31 @@ function shouldRequestHead (qry) {
 }
 
 MangerTransform.prototype.ignore = function (method, uri) {
-  var key = failureKey(method, uri)
-  return this.failures.has(key)
+  const key = failureKey(method, uri)
+  const has = this.failures.has(key)
+  if (has) debug('skipping: %s', uri)
+  return has
 }
 
+const blacklist = RegExp([
+  'ENOTFOUND'
+  // TODO: Add more errors after which to abort after HEAD
+].join('|'), 'i')
+
 MangerTransform.prototype.request = function (qry, cb) {
-  // debug('req: %s', qry.url)
+  const done = (er) => {
+    if (cb) cb(er)
+  }
+
   if (this.ignore('GET', qry.url)) {
-    cb()
+    return done()
   } else if (shouldRequestHead(qry)) {
     if (this.ignore('HEAD', qry.url)) {
-      return cb()
+      return done()
     }
     this.head(qry, (er, res) => {
       if (er) {
         this.emit('error', er)
-
-        const blacklist = RegExp([
-          'ENOTFOUND'
-          // TODO: Add more errors after which to abort after HEAD
-        ].join('|'), 'i')
         const msg = er.message
         if (msg.match(blacklist) !== null) {
           const uri = qry.url
@@ -318,58 +366,66 @@ MangerTransform.prototype.request = function (qry, cb) {
           this.failures.set(key, er.message)
           return remove(this.db, uri, (er) => {
             if (er && !er.notFound) this.emit('error', er)
-            cb()
-            cb = qry = null
+            done()
           })
         }
-
-        this._request(qry, cb)
-        cb = qry = null
-        return
+        return this._request(qry, cb)
       }
-      var h = headary(res)
+
+      const h = headary(res)
+
       if (h.ok) {
         if (res.headers.etag === qry.etag) {
-          cb()
+          return done()
         } else {
-          this._request(qry, cb)
+          return this._request(qry, cb)
         }
-        cb = qry = null
-      } else {
-        if (h.message) {
-          er = new Error(h.message)
-          this._request(qry, cb)
-        } else if (h.url) {
-          const nq = qry.clone(h.url)
-          if (h.permanent) {
-            remove(this.db, qry.url, function (er) {
-              if (er && !er.notFound) this.emit('error', er)
-              this.request(nq, cb)
-            })
-          } else {
-            this.request(nq, cb)
-          }
-          qry = null
-        } else if (h.permanent) {
-          remove(this.db, qry.url, function (er) {
+      }
+
+      if (h.message) {
+        debug('falling back on GET after HEAD message: %s', h.message)
+
+        // We cannot assume that the remote server is handling HEAD requests
+        // correctly, therefor we hit it again with a GET to find out what’s
+        // going on. Our GET handler will eventually emit the error.
+
+        return this._request(qry, cb)
+      }
+
+      if (h.url) {
+        debug('redirecting HEAD %s to %s', qry.url, h.url)
+
+        const code = h.permanent ? 301 : 302
+        const nq = qry.redirect(code, h.url)
+        if (!nq) {
+          return done(new Error('too many redirects'))
+        }
+
+        // It gets fuzzy here: Should we set a redirect?
+
+        if (h.permanent) { // permanent redirect
+          return remove(this.db, qry.url, (er) => {
             if (er && !er.notFound) this.emit('error', er)
-            cb()
-            cb = null
+            this.request(nq, cb)
           })
-          qry = null
-        } else {
-          cb()
-          qry = cb = null
+        } else { // temporary redirect
+          return this.request(nq, cb)
         }
+      }
+
+      if (h.permanent) { // gone
+        return remove(this.db, qry.url, (er) => {
+          if (er && !er.notFound) this.emit('error', er)
+          done()
+        })
+      } else {
+        return done()
       }
     })
   } else {
-    this._request(qry, cb)
-    qry = cb = null
+    return this._request(qry, cb)
   }
 }
-
-// TODO: Move into query module
 
 function processQuery (me, qry) {
   if (!(qry instanceof query.Query)) {
@@ -377,24 +433,29 @@ function processQuery (me, qry) {
     if (qry instanceof Buffer) qry = me.decoder.write(qry)
     if (typeof qry === 'string') {
       qry = query(qry)
-    } else {
+    } else { // plain objects are fine too
       qry = query(qry.url, qry.since, qry.etag, qry.force)
     }
   }
   if (qry) {
     if (me.force) qry.force = true
-    qry.url = me.redirects.get(qry.url) || qry.url
+    const r = me.redirects.get(qry.url)
+    if (r instanceof Redirect) {
+      return qry.redirect(r.code, r.url)
+    }
   }
   return qry
 }
 
-MangerTransform.prototype._transform = function (qry, enc, cb) {
-  qry = processQuery(this, qry)
+MangerTransform.prototype._transform = function (q, enc, cb) {
+  const qry = processQuery(this, q)
+
   if (!qry) {
     this.emit('error', new Error('query error: invalid query'))
     return cb()
   }
-  const uri = qry.url
+
+  const uri = qry.uri()
 
   getETag(this.db, uri, (er, etag) => {
     if (er && !er.notFound) {
@@ -403,11 +464,10 @@ MangerTransform.prototype._transform = function (qry, enc, cb) {
     qry.etag = etag
 
     if (!qry.force && qry.etag) {
-      // To make sure only valid feeds get counted, we emit 'query'
-      // events for cached feeds only.
-      this.emit('query', qry)
+      debug('hit: %s', qry.url)
       this.retrieve(qry, cb)
     } else {
+      debug('miss: %s', qry.url)
       this.request(qry, cb)
     }
   })
@@ -419,7 +479,7 @@ MangerTransform.prototype.uid = function (uri) {
 
 function charsetFromResponse (res) {
   if (!res) return null
-  var a
+  let a
   if (typeof res.getHeader === 'function') {
     a = res.getHeader('content-type')
   } else if (!res.headers) {
@@ -428,9 +488,9 @@ function charsetFromResponse (res) {
     a = res.headers['content-type']
   }
   if (typeof a !== 'string') return null
-  var b = a.split('charset')[1]
+  const b = a.split('charset')[1]
   if (typeof b !== 'string') return null
-  var c = b.split('=')[1]
+  const c = b.split('=')[1]
   if (typeof c !== 'string') return null
   return c.trim()
 }
@@ -444,55 +504,61 @@ function PickupOpts (charset) {
 // the found feeds and entries to the database. When finished, the callback is
 // is applied with an eventual error.
 MangerTransform.prototype.parse = function (qry, res, cb) {
-  const uri = qry.url
-
-  // It still escapes me, why http.IncomingMessage wouldn't provide the URL of its
-  // originating request. Anyways, just pass the query to provide it.
-
-  const me = this
+  const uri = qry.uri()
+  const originalURL = qry.originalURL
 
   const rest = []
   const batch = this.db.batch()
 
-  var ok = true
+  let ok = true
 
-  // TODO: Validate feed
+  // TODO: Adjust original Feed and Entry classes in pickup
+  //
+  // ... to prevent V8 from adding hidden classes.
+  // So, add url and originalURL properties in the pickup module.
 
-  function onFeed (feed) {
-    feed.feed = uri
+  const onFeed = (feed) => {
+    feed.url = uri
+    feed.originalURL = originalURL
+
     feed.updated = Math.max(time(feed), 1)
+
+    if (!this.isFeed(feed)) {
+      debug('invalid feed: %s', feed)
+      return
+    }
 
     const k = schema.feed(uri)
     const v = JSON.stringify(feed)
     batch.put(k, v)
     if (!ok) {
       rest.push(feed)
-    } else if (me.pushFeeds) {
-      ok = me.use(feed)
+    } else if (this.pushFeeds) {
+      ok = this.use(feed, qry)
     }
   }
 
-  // TODO: Validate entry
-
-  function onEntry (entry) {
-    entry.feed = uri
+  const onEntry = (entry) => {
+    entry.url = uri
+    entry.originalURL = originalURL
 
     entry.updated = Math.max(time(entry), 1)
     entry.summary = strings.html(entry.summary)
     entry.duration = strings.duration(entry.duration)
     entry.id = strings.entryID(entry)
 
-    if (typeof entry.id !== 'string') {
+    if (typeof entry.id !== 'string' || !this.isEntry(entry)) {
+      debug('invalid entry: %s', entry)
       return
     }
 
-    var k = schema.entry(uri, entry.updated, entry.id)
-    var v = JSON.stringify(entry)
+    const k = schema.entry(uri, entry.updated, entry.id)
+    const v = JSON.stringify(entry)
     batch.put(k, v)
     if (!ok) {
       rest.push(entry)
-    } else if (me.pushEntries && newer(entry, qry)) {
-      ok = me.use(entry)
+    } else if (this.pushEntries && newer(entry, qry)) {
+      ok = this.use(entry, qry)
     }
   }
 
@@ -506,42 +572,41 @@ MangerTransform.prototype.parse = function (qry, res, cb) {
   function done (er) {
     parser.removeListener('entry', onEntry)
     parser.removeListener('feed', onFeed)
-    cb(er)
-    qry = res = cb = null
+    if (cb) cb(er)
   }
 
   // The callback parameter here is `done(er)`.
-  function dispose (cb) {
-    function write () {
-      var it
-      var ok = true
-      while ((it = rest.shift())) {
-        ok = me.use(it)
+  const dispose = (cb) => {
+    const write = () => {
+      let it
+      let ok = true
+      while (ok && (it = rest.shift())) {
+        ok = this.use(it, qry)
       }
       if (!ok) {
         debug('warning: high water mark exceeded')
-        me.once('drain', write)
+        this.once('drain', write)
       } else {
-        cb()
+        if (cb) cb()
       }
     }
     if (rest.length) {
       write()
     } else {
-      cb()
+      if (cb) cb()
     }
   }
 
-  function drive (reader, writer) {
-    var ok = true
+  const drive = (reader, writer) => {
+    let ok = true
     function onDrain () {
       ok = true
       write()
     }
     function write () {
       if (!ok) return
-      var chunk
-      while ((chunk = reader.read()) !== null) {
+      let chunk
+      while (ok && (chunk = reader.read()) !== null) {
         ok = writer.write(chunk)
       }
       if (!ok) writer.once('drain', onDrain)
@@ -555,26 +620,26 @@ MangerTransform.prototype.parse = function (qry, res, cb) {
       writer.removeListener('drain', onDrain)
       writer.end()
     }
-    function onError (er) {
-      var error = new Error('parse error: ' + er.message + ': parsing: ' + uri)
-      me.emit('error', error)
-      var key = failureKey('GET', uri)
-      me.failures.set(key, er.message)
+    const onError = (er) => {
+      const error = new Error('parse error: ' + er.message + ': parsing: ' + uri)
+      this.emit('error', error)
+      const key = failureKey('GET', uri)
+      this.failures.set(key, er.message)
       onEnd()
     }
-    function onFinish () {
+    const onFinish = () => {
       writer.removeListener('error', onError)
       writer.removeListener('finish', onFinish)
-      var isParser = writer === parser
+      const isParser = writer === parser
       writer = null
 
       if (isParser) {
-        dispose(function (er) {
-          var k = schema.etag(uri)
-          var v = res.headers['etag'] || 'NO_ETAG'
+        dispose((er) => {
+          const k = schema.etag(uri)
+          const v = res.headers['etag'] || 'NO_ETAG'
           batch.put(k, v)
-          batch.write(function (er) {
-            if (er) me.emit('error', er)
+          batch.write((er) => {
+            if (er) this.emit('error', er)
             done()
           })
         })
@@ -590,7 +655,7 @@ MangerTransform.prototype.parse = function (qry, res, cb) {
   }
 
   if (res.headers['content-encoding'] === 'gzip') {
-    var unzip = zlib.createGunzip()
+    const unzip = zlib.createGunzip()
     drive(res, unzip)
     drive(unzip, parser)
   } else {
@@ -608,22 +673,18 @@ function Feeds (db, opts) {
 util.inherits(Feeds, MangerTransform)
 
 Feeds.prototype.retrieve = function (qry, cb) {
-  debug('hit: %s', qry.url)
+  const db = this.db
+  const uri = qry.url
 
-  var me = this
-  var db = this.db
-  var uri = qry.url
-  getFeed(db, uri, function (er, val) {
+  getFeed(db, uri, (er, val) => {
     if (er) {
       if (!er.notFound) {
-        me.emit('error', er)
+        this.emit('error', er)
       }
     } else if (val) {
-      me.use(val)
+      this.use(val, qry)
     }
-    me = null
-    cb()
-    cb = null
+    if (cb) cb()
   })
 }
 
@@ -637,8 +698,6 @@ function Entries (db, opts) {
 util.inherits(Entries, MangerTransform)
 
 Entries.prototype.retrieve = function (qry, cb) {
-  debug('hit: %s', qry.url)
-
   let opts = schema.entries(qry.url, qry.since, true)
   let values = this.db.createValueStream(opts)
   let ok = true
@@ -647,7 +706,7 @@ Entries.prototype.retrieve = function (qry, cb) {
     if (!ok || !values) return
     let chunk
     while (ok && (chunk = values.read()) !== null) {
-      ok = this.use(chunk)
+      ok = this.use(chunk, qry)
     }
     if (!ok) {
       this.once('drain', () => {
@@ -662,8 +721,7 @@ Entries.prototype.retrieve = function (qry, cb) {
     values.removeListener('error', onerror)
     values.removeListener('end', onend)
     values = null
-    cb(er)
-    cb = null
+    if (cb) cb(er)
   }
   function onerror (er) {
     let error = new Error('retrieve error: ' + er.message)
@@ -682,40 +740,38 @@ function URLs (opts) {
 }
 
 URLs.prototype._transform = function (chunk, enc, cb) {
-  var key = bytewise.decode(chunk)
-  var uri = key[1][1]
+  const key = bytewise.decode(chunk)
+  const uri = key[1][1]
   this.push(uri)
   cb()
 }
 
 function list (db, opts) {
-  var keys = db.createKeyStream(schema.allFeeds)
-  var uris = new URLs({ objectMode: true })
-  var ok = true
+  const keys = db.createKeyStream(schema.allFeeds)
+  const uris = new URLs({ objectMode: true })
+  let ok = true
   function write () {
-    if (!ok) return
-    var chunk
-    while ((chunk = keys.read()) !== null) {
+    let chunk
+    while (ok && (chunk = keys.read()) !== null) {
       ok = uris.write(chunk)
     }
-    if (!ok) {
-      uris.once('drain', function () {
-        ok = true
-        write()
-      })
-    }
+    if (!ok) uris.once('drain', ondrain)
+  }
+  function ondrain () {
+    ok = true
+    write()
   }
   function onerror (er) {
-    var error = new Error('list error: ' + er.message)
+    const error = new Error('list error: ' + er.message)
     uris.emit('error', error)
+    onend()
   }
   function onend () {
     keys.removeListener('end', onend)
     keys.removeListener('error', onerror)
     keys.removeListener('readable', write)
-    keys = null
+    uris.removeListener('drain', ondrain)
     uris.end()
-    uris = null
   }
   keys.on('end', onend)
   keys.on('error', onerror)
@@ -731,7 +787,7 @@ function FeedURLs (opts) {
 util.inherits(FeedURLs, stream.Transform)
 
 FeedURLs.prototype._transform = function (chunk, enc, cb) {
-  var uri = chunk.feed
+  const uri = chunk.feed
   if (uri) {
     this.push(uri)
   } else {
@@ -740,28 +796,25 @@ FeedURLs.prototype._transform = function (chunk, enc, cb) {
   cb()
 }
 
-// TODO: Handle netsplit during update
-
 // Updates all feeds in ranked order, hot feeds first, and returns a readable
 // stream of updated feeds. Using ranks as input implies that `flushCounter`  has
 // been run at least once before update has any effect.
-function update (db, opts, x) {
-  var fopts = cp(opts)
+function update (db, opts) {
+  const fopts = cp(opts)
   fopts.force = true
   fopts.objectMode = true
 
-  var s = new Feeds(db, fopts)
-  var r = ranks(db, opts)
+  const r = ranks(db, opts)
+  const s = new Feeds(db, fopts)
 
-  var ok = true
+  let ok = true
 
   function ondrain () {
     ok = true
     write()
   }
   function write () {
-    if (!ok) return
-    var chunk
+    let chunk
     while (ok && (chunk = r.read()) !== null) {
       ok = s.write(chunk)
     }
@@ -769,34 +822,37 @@ function update (db, opts, x) {
       s.once('drain', ondrain)
     }
   }
+  // TODO: Review update input stream error handling
+  //
+  // What does it mean, if the ranks stream emits an error? Do we risk getting
+  // stuck here? Should we better abort?
+  //
   function onerror (er) {
-    var error = new Error('update error: ' + er.message)
+    const error = new Error('update error: ' + er.message)
     s.emit('error', error)
   }
   function onend () {
     r.removeListener('end', onend)
     r.removeListener('error', onerror)
     r.removeListener('readable', write)
-    r = null
 
     s.end()
     s.removeListener('drain', ondrain)
-    s = null
   }
-  r.on('end', onend)
-  r.on('error', onerror)
+  r.once('end', onend)
+  r.once('error', onerror)
   r.on('readable', write)
 
   return s
 }
 
 function getFeed (db, uri, cb) {
-  var key = schema.feed(uri)
+  const key = schema.feed(uri)
   db.get(key, cb)
 }
 
 function getETag (db, uri, cb) {
-  var key = schema.etag(uri)
+  const key = schema.etag(uri)
   db.get(key, cb)
 }
 
@@ -807,26 +863,23 @@ function time (thing) {
 }
 
 function newer (item, qry) {
-  var a = item.updated
-  var b = qry.since
+  const a = item.updated
+  const b = qry.since
   return b === 0 || a > b
 }
 
 function has (db, uri, cb) {
-  getETag(db, uri, function (er, etag) {
-    cb(er)
+  getETag(db, uri, (er, etag) => {
+    if (cb) cb(er)
   })
 }
 
 function remove (db, uri, cb) {
-  has(db, uri, function hasHandler (er) {
+  has(db, uri, (er) => {
     if (er) {
-      cb(er)
-      cb = null
-      return
+      return cb ? cb(er) : null
     }
     function done (er) {
-      if (!cb) return
       keys.removeListener('data', ondata)
       keys.removeListener('end', onend)
       keys.removeListener('error', onerror)
@@ -835,12 +888,11 @@ function remove (db, uri, cb) {
           return new Error('failed to remove: ' + er.message)
         }
       }
-      cb(error())
-      cb = null
+      if (cb) cb(error())
     }
-    var opts = schema.entries(uri, Infinity)
-    var keys = db.createKeyStream(opts)
-    var batch = db.batch()
+    const opts = schema.entries(uri, Infinity)
+    const keys = db.createKeyStream(opts)
+    const batch = db.batch()
     batch.del(schema.etag(uri))
     batch.del(schema.feed(uri))
     function onerror (er) {
@@ -850,9 +902,7 @@ function remove (db, uri, cb) {
       batch.del(chunk)
     }
     function onend () {
-      batch.write(function BatchWriteHandler (er) {
-        done(er)
-      })
+      batch.write((er) => { done(er) })
     }
     keys.on('data', ondata)
     keys.on('end', onend)
@@ -861,18 +911,15 @@ function remove (db, uri, cb) {
 }
 
 function flushCounter (db, counter, cb) {
-  cb = cb || nop
-  rank(db, counter, function (er, count) {
+  rank(db, counter, (er, count) => {
     if (!er) counter.reset()
-    cb(er, count)
-    cb = null
+    if (cb) cb(er, count)
   })
 }
 
 function cp (it) {
-  var o = Object.create(null)
-  it = it ? extend(o, it) : o
-  return it
+  const o = Object.create(null)
+  return it ? Object.assign(o, it) : o
 }
 
 // Transforms rank keys to URLs.
@@ -884,7 +931,8 @@ function Ranks (opts) {
 util.inherits(Ranks, stream.Transform)
 
 Ranks.prototype._transform = function (chunk, enc, cb) {
-  var uri = schema.URIFromRank(chunk)
+  const uri = schema.URIFromRank(chunk)
+  debug('ranked: %s', uri)
   if (!this.push(uri)) {
     this.once('drain', cb)
   } else {
@@ -892,63 +940,55 @@ Ranks.prototype._transform = function (chunk, enc, cb) {
   }
 }
 
+// Creates a new manger cache providing the main API of this package.
 function Manger (name, opts) {
   if (!(this instanceof Manger)) return new Manger(name, opts)
   events.EventEmitter.call(this)
 
   this.opts = defaults(opts)
-
-  // TODO: Move failures and redirects out of opts
-
   this.opts.failures = lru({ max: 500, maxAge: 36e5 * 24 })
   this.opts.redirects = lru({ max: 500, maxAge: 36e5 * 24 })
 
   this.counter = lru({ max: this.opts.counterMax })
 
-  var db = levelup(name, {
+  const db = levelup(name, {
     keyEncoding: bytewise,
     cacheSize: this.opts.cacheSize
   })
-  var me = this
-  function dbGetter () {
+  Object.defineProperty(this, 'db', { get: () => {
     if (!db || db.isClosed()) {
-      me.emit('error', new Error('no database'))
+      this.emit('error', new Error('no database'))
     } else {
       return db
     }
-  }
-  Object.defineProperty(this, 'db', { get: dbGetter })
+  }})
 }
 util.inherits(Manger, events.EventEmitter)
 
-function ranks (db, opts) {
-  var keys = db.createKeyStream(schema.allRanks)
-  var ranks = new Ranks(cp(opts))
+function ranks (db, opts, limit) {
+  const keys = db.createKeyStream(schema.ranks(limit))
+  const ranks = new Ranks(cp(opts))
   function onend () {
-    ranks.end()
-    ranks.removeListener('drain', write)
-    ranks = null
-    keys.removeListener('error', onerror)
     keys.removeListener('end', onend)
-    keys = null
+    keys.removeListener('error', onerror)
+    ranks.end()
+    ranks.removeListener('drain', ondrain)
   }
   function onerror (er) {
     ranks.emit('error', er)
     onend()
   }
-  var ok = true
+  let ok = true
   function write () {
-    if (!ok || !ranks || !keys) return
-    var chunk
-    while ((chunk = keys.read()) !== null) {
+    let chunk
+    while (ok && (chunk = keys.read()) !== null) {
       ok = ranks.write(chunk)
     }
-    if (!ok) {
-      ranks.once('drain', function () {
-        ok = true
-        write()
-      })
-    }
+    if (!ok) ranks.once('drain', ondrain)
+  }
+  function ondrain () {
+    ok = true
+    write()
   }
   keys.on('end', onend)
   keys.on('readable', write)
@@ -957,30 +997,26 @@ function ranks (db, opts) {
 }
 
 // A readable stream of ranked URIs.
-Manger.prototype.ranks = function () {
-  return ranks(this.db, this.opts)
+Manger.prototype.ranks = function (limit) {
+  return ranks(this.db, this.opts, limit)
 }
 
 function resetRanks (db, cb) {
-  var batch = db.batch()
-  var keys = db.createKeyStream(schema.allRanks)
+  const keys = db.createKeyStream(schema.allRanks)
+  const batch = db.batch()
   function done (er) {
-    if (!cb) return
-    batch = null
     keys.removeListener('end', onend)
     keys.removeListener('readable', read)
     keys.removeListener('error', onerror)
-    keys = null
     function error () {
       if (er) {
         return new Error('failed to reset ranks: ' + er.message)
       }
     }
-    cb(error())
-    cb = null
+    if (cb) cb(error())
   }
   function onend (er) {
-    batch.write(function (er) {
+    batch.write((er) => {
       done(er)
     })
   }
@@ -988,7 +1024,7 @@ function resetRanks (db, cb) {
     done(er)
   }
   function read () {
-    var key
+    let key
     while ((key = keys.read()) !== null) {
       batch.del(key)
     }
@@ -1007,34 +1043,41 @@ Manger.prototype.feeds = function () {
 }
 
 Manger.prototype.entries = function () {
-  var s = new Entries(this.db, this.opts)
-  var counter = this.counter
-  function onquery (qry) {
-    var k = qry.url
-    var c = counter.peek(k) || 0
-    counter.set(k, ++c)
+  const s = new Entries(this.db, this.opts)
+
+  const onquery = (qry) => {
+    const k = qry.uri()
+    let c = this.counter.peek(k) || 0
+    this.counter.set(k, ++c)
   }
   function deinit () {
-    if (!s) return
     s.removeListener('error', deinit)
     s.removeListener('finish', deinit)
     s.removeListener('query', onquery)
-    s = null
-    counter = null
   }
-  s.on('error', deinit)
-  s.on('finish', deinit)
+  s.once('error', deinit)
+  s.once('finish', deinit)
   s.on('query', onquery)
+
   return s
+}
+
+// TODO: Write concurrent update function
+
+function _update (db, opts, max) {
+  throw new Error('NIY')
 }
 
 Manger.prototype.flushCounter = function (cb) {
   return flushCounter(this.db, this.counter, cb)
 }
 
-// -x Number of concurrent streams to use
-Manger.prototype.update = function (x) {
-  return update(this.db, this.opts, x)
+Manger.prototype.update = function (max = 1) {
+  if (typeof max !== 'number' || max === 1) {
+    return update(this.db, this.opts)
+  } else {
+    return _update(this.db, this.opts, max)
+  }
 }
 
 Manger.prototype.list = function () {

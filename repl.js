@@ -34,8 +34,8 @@ const update = function () {
   })
   return s
 }
-const ranks = function () {
-  const s = svc.ranks()
+const ranks = function (limit) {
+  const s = svc.ranks(limit)
   s.on('error', console.error)
   return s
 }
