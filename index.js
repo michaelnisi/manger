@@ -112,8 +112,6 @@ MangerTransform.prototype._flush = function (cb) {
 // - chunk Buffer() | Object() The chunk to be written.
 // - qry Query() The current query, passed to enable us to deal with redirects.
 MangerTransform.prototype.use = function (chunk, qry) {
-  this.emit('query', qry)
-
   const uri = qry.uri()
   const originalURL = qry.originalURL
 
@@ -464,7 +462,7 @@ MangerTransform.prototype._transform = function (q, enc, cb) {
     qry.etag = etag
 
     if (!qry.force && qry.etag) {
-      debug('hit: %s', qry.url)
+      this.emit('hit', qry)
       this.retrieve(qry, cb)
     } else {
       debug('miss: %s', qry.url)
@@ -1045,19 +1043,20 @@ Manger.prototype.feeds = function () {
 Manger.prototype.entries = function () {
   const s = new Entries(this.db, this.opts)
 
-  const onquery = (qry) => {
+  const onhit = (qry) => {
     const k = qry.uri()
     let c = this.counter.peek(k) || 0
+    debug('hit: %s %s', k, c)
     this.counter.set(k, ++c)
   }
   function deinit () {
     s.removeListener('error', deinit)
     s.removeListener('finish', deinit)
-    s.removeListener('query', onquery)
+    s.removeListener('hit', onhit)
   }
   s.once('error', deinit)
   s.once('finish', deinit)
-  s.on('query', onquery)
+  s.on('hit', onhit)
 
   return s
 }

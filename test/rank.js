@@ -1,11 +1,11 @@
 'use strict'
 
-var common = require('./lib/common')
-var bytewise = require('bytewise')
-var lru = require('lru-cache')
-var rank = require('../lib/rank')
-var schema = require('../lib/schema')
-var test = require('tap').test
+const common = require('./lib/common')
+const bytewise = require('bytewise')
+const lru = require('lru-cache')
+const rank = require('../lib/rank')
+const schema = require('../lib/schema')
+const test = require('tap').test
 
 function QueryCount (uri, count) {
   if (!(this instanceof QueryCount)) return new QueryCount(uri, count)
@@ -13,56 +13,54 @@ function QueryCount (uri, count) {
   this.count = count
 }
 
-test('allFeeds', { skip: false }, function (t) {
-  var db = common.freshManger().db
-  var uris = ['abc', 'def', 'ghi']
-  var ops = uris.map(function (uri) {
-    var key = schema.feed(uri)
+test('allFeeds', { skip: false }, (t) => {
+  const db = common.freshManger().db
+  const uris = ['abc', 'def', 'ghi']
+  const ops = uris.map(uri => {
+    const key = schema.feed(uri)
     return { type: 'put', key: key, value: '{}' }
   })
   t.plan(1)
-  db.batch(ops, function (er) {
+  db.batch(ops, (er) => {
     if (er) throw er
-    var f = rank.allFeeds
-    f(db, function (er, found) {
+    const f = rank.allFeeds
+    f(db, (er, found) => {
       if (er) throw er
-      var wanted = uris
+      const wanted = uris
       t.same(found, wanted)
     })
   })
 })
 
-test('rank', function (t) {
-  var counts = [
+test('rank', (t) => {
+  const counts = [
     QueryCount('abc', 3),
     QueryCount('def', 1),
     QueryCount('ghi', 2)
   ]
-  var cache = lru()
-  counts.forEach(function (c) {
-    cache.set(c.uri, c.count)
-  })
-  var ops = counts.map(function (c) {
-    var key = schema.rank(c.uri, c.count)
+  const cache = lru()
+  counts.forEach(c => { cache.set(c.uri, c.count) })
+  const ops = counts.map(c => {
+    const key = schema.rank(c.uri, c.count)
     return { type: 'put', key: key, value: c.count }
   })
 
-  var uncounted = ['jkl', 'mno', 'pqr']
-  uncounted.forEach(function (uri) {
-    var key = schema.feed(uri)
-    var op = { type: 'put', key: key, value: '{}' }
+  const uncounted = ['jkl', 'mno', 'pqr']
+  uncounted.forEach(uri => {
+    const key = schema.feed(uri)
+    const op = { type: 'put', key: key, value: '{}' }
     ops.push(op)
   })
 
-  var db = common.freshManger().db
+  const db = common.freshManger().db
   t.plan(4)
-  db.batch(ops, function (er) {
+  db.batch(ops, (er) => {
     if (er) throw er
     t.pass('batch applied callback')
     cache.set('jkl', 5)
-    rank(db, cache, function (er, count) {
+    rank(db, cache, (er, count) => {
       if (er) throw er
-      var wanted = [
+      const wanted = [
         ['manger', ['rank', 6, 'abc']],
         ['manger', ['rank', 5, 'jkl']],
         ['manger', ['rank', 4, 'ghi']],
@@ -72,21 +70,21 @@ test('rank', function (t) {
       ]
       t.is(count, wanted.length)
       t.pass('rank applied callback')
-      var opts = schema.allRanks
+      const opts = schema.allRanks
       opts.reverse = true
-      var s = db.createKeyStream(opts)
-      var found = []
-      s.on('data', function (chunk) {
+      const s = db.createKeyStream(opts)
+      const found = []
+      s.on('data', (chunk) => {
         found.push(bytewise.decode(chunk))
       })
-      s.on('end', function () {
+      s.on('end', () => {
         t.same(found, wanted)
       })
     })
   })
 })
 
-test('teardown', function (t) {
+test('teardown', (t) => {
   t.ok(!common.teardown())
   t.end()
 })
