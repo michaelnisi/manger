@@ -3,7 +3,7 @@
 
 # manger - cache feeds
 
-The **manger** [Node](http://nodejs.org/) package provides caching for RSS and Atom formatted XML feeds, it implements an interface to query entries by feed and time.
+The **manger** [Node.js](http://nodejs.org/) package provides caching for RSS and Atom formatted XML feeds, it implements an interface to query entries by feed and time.
 
 ## Types
 
@@ -56,12 +56,12 @@ An individual entry.
 - `id` `String()` A globally unique, not the original, identifier for this entry.
 - `image` `str()`
 - `link` `str()`
-- `originalURL` `str()` The URL of this entry’s parent feed.
+- `originalURL` `str()` The originally requested URL.
 - `subtitle` `str()`
 - `summary` `html() | void()`
 - `title` `str()`
 - `updated` `str()`
-- `url` `str()` The URL of this entry’s parent feed.
+- `url` `str()` The URL of this entry’s feed.
 
 ### query()
 
@@ -103,7 +103,7 @@ If `opts` has `objectMode` set to `true`, results are read as `Object` types, in
 
 **manger** leverages the lexicographical key sort order of [LevelDB](http://leveldb.org/). The keys are designed to stream feeds or entries in time ranges between now and some user defined point in the past.
 
-The distinction between feed and entries might be unclear. A feed models the metadata of an RSS or Atom feed (title, author, published, etc.), while entries are the actual items in the feed. These are detached to not repeatedly transmit feed metadata—after all **manger** tries to reduce round-trips.
+The distinction between feed and entries might be unclear: a feed models the metadata of an RSS or Atom feed (title, author, published, etc.), while entries are the actual items in the feed. These are detached to not repeatedly transmit feed metadata—after all **manger** tries to reduce round-trips.
 
 Let’s create a **manger** instance named `cache` to document the API:
 
@@ -132,9 +132,11 @@ A [Readable](http://nodejs.org/api/stream.html#stream_class_stream_readable_1) s
 
 - `read()` `Buffer() | str()`
 
-### cache.update()
+### cache.update(concurrencyLevel = 1)
 
-Updates all ranked feeds and returns a stream that emits feed URLs of updated feeds. This, of course, could produce a resource heavy operation! Feeds are updated ordered by their popularity, using the rank index, therefore `flushCounter` must have been invoked before this method can take any effect.
+- `concurrencyLevel` `Number()` Tune the number of concurrent streams.
+
+Updates all ranked feeds and returns a stream that emits feed URLs of updated feeds. This, of course, could produce a resource heavy operation! Feeds are updated ordered by their popularity, using the rank index, therefor `flushCounter` must have been invoked before this method takes any effect. With `concurrencyLevel` you can choose how many transform streams will be used to concurrently do the work.
 
 - `read()` `str()`
 

@@ -17,6 +17,7 @@ const pickup = require('pickup')
 const query = require('./lib/query')
 const rank = require('./lib/rank')
 const schema = require('./lib/schema')
+const speculum = require('speculum')
 const stream = require('readable-stream')
 const stringDecoder = require('string_decoder')
 const strings = require('./lib/strings')
@@ -796,14 +797,20 @@ FeedURLs.prototype._transform = function (chunk, enc, cb) {
 
 // Updates all feeds in ranked order, hot feeds first, and returns a readable
 // stream of updated feeds. Using ranks as input implies that `flushCounter`  has
-// been run at least once before update has any effect.
-function update (db, opts) {
+// been run at least once before update has any effect. To reduce run time, the
+// Feeds stream is multiplied by speculum.
+//
+// - x Number() | null | undefined The concurrency level defaults to one.
+function update (db, opts, x) {
+  const r = ranks(db, opts)
+
   const fopts = cp(opts)
   fopts.force = true
   fopts.objectMode = true
 
-  const r = ranks(db, opts)
-  const s = new Feeds(db, fopts)
+  const s = speculum({ objectMode: true }, () => {
+    return new Feeds(db, fopts)
+  }, x)
 
   let ok = true
 
@@ -1061,22 +1068,12 @@ Manger.prototype.entries = function () {
   return s
 }
 
-// TODO: Write concurrent update function
-
-function _update (db, opts, max) {
-  throw new Error('NIY')
-}
-
 Manger.prototype.flushCounter = function (cb) {
   return flushCounter(this.db, this.counter, cb)
 }
 
-Manger.prototype.update = function (max = 1) {
-  if (typeof max !== 'number' || max === 1) {
-    return update(this.db, this.opts)
-  } else {
-    return _update(this.db, this.opts, max)
-  }
+Manger.prototype.update = function (concurrencyLevel = 1) {
+  return update(this.db, this.opts, concurrencyLevel)
 }
 
 Manger.prototype.list = function () {
