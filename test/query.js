@@ -102,7 +102,6 @@ test('request', (t) => {
 })
 
 test('redirect', t => {
-  // TODO: Add more tests
   const found = [
     query('http://abc.de').redirect(301, 'http://fgh.ij')
   ]

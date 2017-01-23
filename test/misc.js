@@ -4,8 +4,6 @@ var manger = require('../')
 var stringDecoder = require('string_decoder')
 var test = require('tap').test
 
-// TODO: Rename 'misc.js' to something less subtle
-
 test('charset from response', function (t) {
   var f = manger.charsetFromResponse
   function res (str) {

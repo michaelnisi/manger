@@ -155,63 +155,6 @@ test('permanent redirection', { skip: false }, (t) => {
   go([cache.feeds(), cache.entries()])
 })
 
-test('temporary redirection', { skip: false }, t => {
-  const headers = {
-    'content-type': 'text/xml; charset=UTF-8',
-    'ETag': '55346232-18151',
-    'Location': 'http://some/ddc'
-  }
-  const scopes = [
-    nock('http://just'),
-    nock('http://some')
-  ]
-  scopes[0].get('/b2w').reply(302, () => {
-  }, headers)
-  scopes[1].get('/ddc').reply(200, () => {
-    const p = path.join(__dirname, 'data', 'ddc.xml')
-    return fs.createReadStream(p)
-  })
-
-  const cache = common.freshManger()
-  const uri = 'http://just/b2w'
-
-  function run (s, cb) {
-    let buf = ''
-    s.on('data', chunk => { buf += chunk })
-    s.on('error', er => { t.fail() })
-    s.on('end', () => {
-      JSON.parse(buf).forEach(item => {
-        t.is(item.originalURL, uri)
-        t.is(item.url, uri)
-      })
-      const feeds = cache.list()
-      const uris = []
-      feeds.on('data', (uri) => {
-        uris.push(uri)
-      })
-      feeds.on('end', () => {
-        t.is(uris.length, 1)
-        t.is(uris[0], uri)
-        cb()
-      })
-    })
-    s.end(uri)
-  }
-
-  function go (checks) {
-    const check = checks.pop()
-    if (!check) {
-      scopes.forEach(scope => {
-        t.ok(scope.isDone(), 'scope should be done')
-      })
-      return t.end()
-    }
-    run(check, () => { go(checks) })
-  }
-
-  go([cache.entries(), cache.feeds()])
-})
-
 test('redirection of cached', { skip: false }, t => {
   const scopes = [
     nock('http://just'),

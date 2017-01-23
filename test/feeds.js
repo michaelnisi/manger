@@ -25,7 +25,7 @@ test('a single plain query', (t) => {
   assert(feeds instanceof stream.Readable, 'should be Readable')
   let chunks = ''
 
-  feeds.on('data', chunk => { chunks += chunk })
+  feeds.on('data', (chunk) => { chunks += chunk })
   feeds.on('end', () => {
     const p = path.join(__dirname, 'data', 'b2w.json')
     const data = fs.readFileSync(p)

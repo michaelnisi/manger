@@ -84,8 +84,6 @@ test('time range', { skip: false }, (t) => {
     entries.on('data', (chunk) => { chunks += chunk })
     entries.on('end', () => { cb(null, chunks) })
 
-    // TODO: Investigate edge cases
-
     const rawQueries = JSON.stringify([
       { url: 'http://just/b2w',
         since: new Date('Tue, 17 Dec 2013 22:00:00 GMT')

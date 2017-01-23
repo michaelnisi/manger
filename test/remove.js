@@ -31,21 +31,50 @@ test('setup', function (t) {
   feeds.end('http://just/b2w')
 })
 
-test('remove', function (t) {
-  t.plan(1)
-  var uri = 'http://just/b2w'
-  cache.has(uri, function (er) {
-    if (er) throw er
-    cache.remove(uri, function (er) {
+test('rank', t => {
+  const feeds = cache.feeds()
+  const uri = 'http://just/b2w'
+  feeds.end(uri)
+  feeds.on('end', () => {
+    cache.flushCounter(er => {
       if (er) throw er
-      cache.has(uri, function (er) {
-        t.ok(er.notFound)
+      const ranks = cache.ranks()
+      let found = ''
+      ranks.on('data', chunk => { found += chunk })
+      ranks.on('end', () => {
+        t.is(found, uri)
+        t.end()
+      })
+    })
+  })
+  feeds.resume()
+})
+
+test('remove', t => {
+  t.plan(3)
+  const uri = 'http://just/b2w'
+
+  cache.has(uri, er => {
+    if (er) throw er
+    cache.remove(uri, er => {
+      if (er) throw er
+      cache.has(uri, er => { t.ok(er.notFound) })
+
+      cache.db.createKeyStream()
+        .on('data', chunk => { t.fail() })
+        .on('end', () => { t.pass('should be empty') })
+
+      const ranks = cache.ranks()
+      let found = ''
+      ranks.on('data', chunk => { found += chunk })
+      ranks.on('end', () => {
+        t.is(found, '')
       })
     })
   })
 })
 
-test('teardown', function (t) {
+test('teardown', t => {
   t.ok(!common.teardown())
   t.end()
 })

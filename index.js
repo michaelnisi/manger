@@ -116,28 +116,38 @@ MangerTransform.prototype.use = function (chunk, qry) {
   const uri = qry.uri()
   const originalURL = qry.originalURL
 
-  // The data, we’re trying to parse here, comes from within our own system,
-  // should it be corrupt and thus JSON failing to parse it, we better crash.
+  // While handling redirects and when in `objectMode`, we have to parse `chunk`.
+  // The data, we’re trying to parse though, comes from within our own system,
+  // should it be corrupt and thus `JSON` failing to parse it, we’ve got nothing
+  // and better crash. But we hardly ever parse at all and rarely stringify.
 
   let it
+
   let obj = typeof chunk === 'object'
   if (this._readableState.objectMode) {
     it = obj ? chunk : JSON.parse(chunk)
-    it.feed = uri
+    it.url = uri
     it.originalURL = originalURL
   } else {
     if (originalURL) {
       if (!obj) {
         obj = true
         chunk = JSON.parse(chunk)
-        chunk.feed = uri
+        chunk.url = uri
         chunk.originalURL = originalURL
       }
     }
+
     const chars = ['[', ',']
-    it = chars[this.state] + (obj ? JSON.stringify(chunk) : chunk)
+    if (obj) {
+      it = chars[this.state] + JSON.stringify(chunk)
+    } else {
+      it = chars[this.state] + chunk
+    }
+
     if (this.state === 0) this.state = 1
   }
+
   return this.push(it)
 }
 
@@ -374,7 +384,7 @@ MangerTransform.prototype.request = function (qry, cb) {
       const h = headary(res)
 
       if (h.ok) {
-        if (res.headers.etag === qry.etag) {
+        if (sameEtag(qry, res)) {
           return done()
         } else {
           return this._request(qry, cb)
@@ -401,6 +411,7 @@ MangerTransform.prototype.request = function (qry, cb) {
         }
 
         // It gets fuzzy here: Should we set a redirect?
+        // this.redirects.set(nq.originalURL, new Redirect(nq.code, nq.url))
 
         if (h.permanent) { // permanent redirect
           return remove(this.db, qry.url, (er) => {
@@ -463,10 +474,11 @@ MangerTransform.prototype._transform = function (q, enc, cb) {
     qry.etag = etag
 
     if (!qry.force && qry.etag) {
+      debug('hit: %s', uri)
       this.emit('hit', qry)
       this.retrieve(qry, cb)
     } else {
-      debug('miss: %s', qry.url)
+      debug('miss: %s', uri)
       this.request(qry, cb)
     }
   })
@@ -511,11 +523,6 @@ MangerTransform.prototype.parse = function (qry, res, cb) {
 
   let ok = true
 
-  // TODO: Adjust original Feed and Entry classes in pickup
-  //
-  // ... to prevent V8 from adding hidden classes.
-  // So, add url and originalURL properties in the pickup module.
-
   const onFeed = (feed) => {
     feed.url = uri
     feed.originalURL = originalURL
@@ -523,12 +530,13 @@ MangerTransform.prototype.parse = function (qry, res, cb) {
     feed.updated = Math.max(time(feed), 1)
 
     if (!this.isFeed(feed)) {
-      debug('invalid feed: %s', feed)
+      debug('invalid feed: %s', feed.url)
       return
     }
 
     const k = schema.feed(uri)
     const v = JSON.stringify(feed)
+    debug('put: %s', uri)
     batch.put(k, v)
     if (!ok) {
       rest.push(feed)
@@ -547,7 +555,7 @@ MangerTransform.prototype.parse = function (qry, res, cb) {
     entry.id = strings.entryID(entry)
 
     if (typeof entry.id !== 'string' || !this.isEntry(entry)) {
-      debug('invalid entry: %s', entry)
+      debug('invalid entry: %s', entry.url)
       return
     }
 
@@ -673,7 +681,7 @@ util.inherits(Feeds, MangerTransform)
 
 Feeds.prototype.retrieve = function (qry, cb) {
   const db = this.db
-  const uri = qry.url
+  const uri = qry.uri()
 
   getFeed(db, uri, (er, val) => {
     if (er) {
@@ -697,7 +705,7 @@ function Entries (db, opts) {
 util.inherits(Entries, MangerTransform)
 
 Entries.prototype.retrieve = function (qry, cb) {
-  let opts = schema.entries(qry.url, qry.since, true)
+  let opts = schema.entries(qry.uri(), qry.since, true)
   let values = this.db.createValueStream(opts)
   let ok = true
 
@@ -892,14 +900,17 @@ function remove (db, uri, cb) {
         if (er) {
           return new Error('failed to remove: ' + er.message)
         }
+        debug('removed: %s', uri)
       }
       if (cb) cb(error())
     }
-    const opts = schema.entries(uri, Infinity)
+    const opts = schema.entries(uri, 0)
     const keys = db.createKeyStream(opts)
     const batch = db.batch()
+
     batch.del(schema.etag(uri))
     batch.del(schema.feed(uri))
+
     function onerror (er) {
       done(er)
     }
@@ -907,7 +918,21 @@ function remove (db, uri, cb) {
       batch.del(chunk)
     }
     function onend () {
-      batch.write((er) => { done(er) })
+      const ranked = schema.ranked(uri)
+      db.get(ranked, (er, count) => {
+        if (er && !er.notFound) {
+          return done(er)
+        }
+        const c = parseInt(count)
+        if (!isNaN(c)) {
+          const rank = schema.rank(uri, c)
+          batch.del(rank)
+          batch.del(ranked)
+        }
+        batch.write((er) => {
+          done(er)
+        })
+      })
     }
     keys.on('data', ondata)
     keys.on('end', onend)
@@ -1053,7 +1078,6 @@ Manger.prototype.entries = function () {
   const onhit = (qry) => {
     const k = qry.uri()
     let c = this.counter.peek(k) || 0
-    debug('hit: %s %s', k, c)
     this.counter.set(k, ++c)
   }
   function deinit () {

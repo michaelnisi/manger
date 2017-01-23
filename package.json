@@ -1,6 +1,6 @@
 {
   "name": "manger",
-  "version": "6.1.0",
+  "version": "6.1.1",
   "description": "cache feeds",
   "main": "index.js",
   "scripts": {
@@ -36,7 +36,7 @@
     "pickup": "^5.1.0",
     "readable-stream": "^2.2.1",
     "sanitize-html": "^1.13.0",
-    "speculum": "^4.0.0"
+    "speculum": "^4.0.1"
   },
   "devDependencies": {
     "lino": "^1.0.0",
