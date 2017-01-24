@@ -268,7 +268,6 @@ MangerTransform.prototype._request = function (qry, cb) {
     done(er)
   }
 
-  // TODO: Evaluate if this is necessary
   let onRemoveAfterRedirect // defined later, so we can cleanup its scope
 
   const onResponse = (res) => {
