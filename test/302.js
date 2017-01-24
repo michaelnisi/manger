@@ -1,10 +1,12 @@
 'use strict'
 
+const StringDecoder = require('string_decoder').StringDecoder
 const common = require('./lib/common')
 const nock = require('nock')
 const test = require('tap').test
 
 const cache = common.freshManger()
+const decoder = new StringDecoder('utf8')
 
 const scopes = [
   nock('http://first.ly'),
@@ -158,6 +160,32 @@ test('feeds', (t) => {
   })
 
   s.end(uri)
+})
+
+test('flush counter', (t) => {
+  cache.flushCounter((er, count) => {
+    if (er) throw er
+    t.is(count, 1)
+    t.end()
+  })
+})
+
+test('ranks', (t) => {
+  const s = cache.ranks()
+
+  const urls = []
+  s.on('data', (chunk) => {
+    urls.push(decoder.write(chunk))
+  })
+
+  s.on('end', () => {
+    t.is(urls.length, 1)
+
+    const url = urls[0]
+    t.is(url, uri)
+
+    t.end()
+  })
 })
 
 test('teardown', (t) => {
