@@ -110,51 +110,6 @@ test('ETag', { skip: false }, (t) => {
   feeds.end()
 })
 
-test('permanent redirection', { skip: false }, (t) => {
-  const headers = {
-    'content-type': 'text/xml; charset=UTF-8',
-    'ETag': '55346232-18151',
-    'Location': 'http://some/ddc'
-  }
-  const scopes = [
-    nock('http://just'),
-    nock('http://some')
-  ]
-  scopes[0].get('/b2w').reply(301, () => {
-  }, headers)
-  scopes[1].get('/ddc').reply(200, () => {
-    const p = path.join(__dirname, 'data', 'ddc.xml')
-    return fs.createReadStream(p)
-  })
-
-  function run (s, cb) {
-    let buf = ''
-    s.on('data', chunk => { buf += chunk })
-    s.on('end', () => {
-      JSON.parse(buf).forEach((item) => {
-        t.is(item.originalURL, 'http://just/b2w')
-        t.is(item.url, 'http://some/ddc')
-      })
-      cb()
-    })
-    s.end('http://just/b2w')
-  }
-
-  function go (checks) {
-    const check = checks.pop()
-    if (!check) {
-      scopes.forEach(scope => {
-        t.ok(scope.isDone(), 'scope should be done')
-      })
-      return t.end()
-    }
-    run(check, () => { go(checks) })
-  }
-
-  const cache = common.freshManger()
-  go([cache.feeds(), cache.entries()])
-})
-
 test('redirection of cached', { skip: false }, t => {
   const scopes = [
     nock('http://just'),
