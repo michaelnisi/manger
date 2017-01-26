@@ -118,7 +118,7 @@ MangerTransform.prototype.use = function (chunk, qry) {
 
   // While handling redirects and when in `objectMode`, we have to parse `chunk`.
   // The data, we’re trying to parse though, comes from within our own system,
-  // should it be corrupt and thus `JSON` failing to parse it, we’ve got nothing
+  // should it be corrupt and thus `JSON` failing to parse it, we got nothing
   // and better crash. But we hardly ever parse at all and rarely stringify.
 
   let it
@@ -141,7 +141,7 @@ MangerTransform.prototype.use = function (chunk, qry) {
     const chars = ['[', ',']
     if (obj) {
       it = chars[this.state] + JSON.stringify(chunk)
-    } else {
+    } else { // main route
       it = chars[this.state] + chunk
     }
 
@@ -341,6 +341,12 @@ function shouldRequestHead (qry) {
   return !!qry.etag && qry.etag !== 'NO_ETAG'
 }
 
+// Returns true if the `uri` should be ignored, `method` is used to distinct GET
+// and HEAD request, accepting that some servers aren’t implementing HTTP HEAD
+// properly.
+//
+// - method String() The HTTP method.
+// - uri String() The URL to check.
 MangerTransform.prototype.ignore = function (method, uri) {
   const key = failureKey(method, uri)
   const has = this.failures.has(key)
@@ -1078,12 +1084,15 @@ Manger.prototype.entries = function () {
     const k = qry.uri()
     let c = this.counter.peek(k) || 0
     this.counter.set(k, ++c)
+    this.emit('hit', qry)
   }
+
   function deinit () {
     s.removeListener('error', deinit)
     s.removeListener('finish', deinit)
     s.removeListener('hit', onhit)
   }
+
   s.once('error', deinit)
   s.once('finish', deinit)
   s.on('hit', onhit)

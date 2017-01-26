@@ -181,6 +181,12 @@ Attempts to remove a feed matching the `url` from the cache and applies callback
 - `cb` `Function(error) | void()` The callback
   - `error` `Error() | void()` The possible error
 
+#### Event: 'hit'
+
+- `query()` The query hitting the cache.
+
+Making sure you feel good about yourself.
+
 ## Additional exports
 
 The **manger** module decorates the exported `Manger` constructor with two convenience functions for querying the cache.
