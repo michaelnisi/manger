@@ -627,7 +627,6 @@ MangerTransform.prototype.parse = function (qry, res, cb) {
       reader.removeListener('end', onEnd)
       reader.removeListener('error', onError)
       reader.removeListener('readable', write)
-      reader = null
 
       writer.removeListener('drain', onDrain)
       writer.end()
@@ -643,7 +642,6 @@ MangerTransform.prototype.parse = function (qry, res, cb) {
       writer.removeListener('error', onError)
       writer.removeListener('finish', onFinish)
       const isParser = writer === parser
-      writer = null
 
       if (isParser) {
         dispose((er) => {
@@ -710,12 +708,12 @@ function Entries (db, opts) {
 util.inherits(Entries, MangerTransform)
 
 Entries.prototype.retrieve = function (qry, cb) {
-  let opts = schema.entries(qry.uri(), qry.since, true)
-  let values = this.db.createValueStream(opts)
-  let ok = true
+  const opts = schema.entries(qry.uri(), qry.since, true)
+  const values = this.db.createValueStream(opts)
 
+  let ok = true
   const use = () => {
-    if (!ok || !values) return
+    if (!ok) return
     let chunk
     while (ok && (chunk = values.read()) !== null) {
       ok = this.use(chunk, qry)
@@ -728,17 +726,16 @@ Entries.prototype.retrieve = function (qry, cb) {
     }
   }
   function onend (er) {
-    if (!values) return
     values.removeListener('readable', use)
     values.removeListener('error', onerror)
     values.removeListener('end', onend)
-    values = null
     if (cb) cb(er)
   }
   function onerror (er) {
     let error = new Error('retrieve error: ' + er.message)
     onend(error)
   }
+
   values.on('readable', use)
   values.on('error', onerror)
   values.on('end', onend)
