@@ -10,34 +10,31 @@ const nock = require('nock')
 const path = require('path')
 const test = require('tap').test
 
-test('socket destruction', { skip: false }, t => {
-  nock('http://abc.de').get('/').reply(function () {
-    this.req.destroy()
-  })
+test('request error', { skip: false }, t => {
+  nock('http://abc.de').get('/').replyWithError('shit happens')
 
   const store = common.freshManger()
   const feeds = store.feeds()
-  const uri = 'http://abc.de/'
-  const qry = manger.query(uri, null, null, true)
-  t.ok(feeds.write(qry))
-  feeds.end()
 
   let buf = ''
   const dec = new StringDecoder('utf8')
   feeds.on('end', () => {
     const found = dec.write(buf)
     t.is(found, '[]')
-    t.end()
   })
   feeds.on('readable', () => {
     let chunk
     while ((chunk = feeds.read())) { buf += chunk }
   })
   feeds.on('error', (er) => {
-    console.log(er)
+    t.is(er.message, 'shit happens')
   })
-  // Well OK! I guess, this doesn't work with nock. I'd expect a 'socket hang up'
-  // error here.
+
+  t.plan(2)
+
+  const uri = 'http://abc.de/'
+  const qry = manger.query(uri, null, null, true)
+  feeds.end(qry)
 })
 
 test('ETag', { skip: false }, (t) => {
@@ -242,6 +239,37 @@ test('HEAD not found', { skip: false }, t => {
   t.ok(feeds.write(qry))
 
   feeds.end()
+})
+
+test('HEAD request error during update', { skip: false }, t => {
+  const scope = nock('http://hello')
+  const headers = {
+    'content-type': 'text/xml; charset=UTF-8',
+    'ETag': '55346232-18151'
+  }
+
+  const p = path.join(__dirname, 'data', 'b2w.xml')
+  scope.get('/').replyWithFile(200, p, headers)
+  scope.head('/').replyWithError('oh shit')
+  scope.get('/').replyWithError('oh shit')
+
+  const store = common.freshManger()
+
+  const feeds = store.feeds()
+  feeds.on('error', (er) => { t.is(er.message, 'oh shit', 'should err twice') })
+  feeds.on('end', () => { t.ok(scope.isDone()) })
+
+  t.plan(6)
+
+  const uri = 'http://hello/'
+  t.ok(feeds.write(uri), 'should GET')
+  t.ok(feeds.write(uri), 'should hit cache')
+
+  const qry = manger.query(uri, null, null, true)
+  t.ok(feeds.write(qry))
+
+  feeds.end()
+  feeds.resume()
 })
 
 test('teardown', t => {

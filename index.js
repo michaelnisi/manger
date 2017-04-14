@@ -250,24 +250,19 @@ MangerTransform.prototype._request = function (qry, cb) {
     onParse = onRemove = onRemoveAfterRedirect = null
   }
 
-  const done = (er) => {
+  let done = (er) => {
+    removeListeners()
+
     // The `notFound` property was set by levelup, marking this error irrelevant.
     if (er && !er.notFound) {
       er.url = qry.url
       this.emit('error', er)
     }
-    removeListeners()
     if (cb) cb()
   }
 
-  let onParse = function (er) {
-    done(er)
-  }
-
-  let onRemove = function (er) {
-    done(er)
-  }
-
+  let onParse = (er) => { if (typeof done === 'function') done(er) }
+  let onRemove = (er) => { done(er) }
   let onRemoveAfterRedirect // defined later, so we can cleanup its scope
 
   const onResponse = (res) => {
@@ -320,16 +315,21 @@ MangerTransform.prototype._request = function (qry, cb) {
 
   const onRequestError = (er) => {
     debug(er)
-    req.abort()
 
     const key = failureKey('GET', qry.url)
     this.failures.set(key, er.message)
 
-    const error = new Error(er.message)
-    error.code = er.code
-    error.url = qry.url
-
     done(er)
+
+    // Because request errors can occur while we’re parsing, sometimes, although
+    // very rarely, resulting in a successfully ending parse, after a request
+    // error had already terminated our scope, we nullify our callback after
+    // we’ve applied it from here.
+
+    done = null
+
+    req.once('error', () => {}) // handles next line
+    req.abort()
   }
 
   let req = mod.get(opts, onResponse)
