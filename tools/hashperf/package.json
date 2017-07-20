@@ -1,0 +1,21 @@
+{
+  "name": "hashperf",
+  "version": "1.0.0",
+  "description": "Measure non-cryptographic hash functions",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "measure",
+    "hash"
+  ],
+  "author": "Michael Nisi <michael.nisi@gmail.com>",
+  "license": "ISC",
+  "dependencies": {
+    "beautify-benchmark": "^0.2.4",
+    "benchmark": "^2.1.4",
+    "xxhash": "^0.2.4"
+  }
+}
