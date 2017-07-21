@@ -1,6 +1,11 @@
+'use strict'
+
+// hashperf - measure non-cryptographic hash functions
+
 const benchmark = require('benchmark')
 const benchmarks = require('beautify-benchmark')
 const crypto = require('crypto')
+const fnv = require('dding-fnv')
 const fs = require('fs')
 const xxhash = require('xxhash')
 
@@ -19,13 +24,18 @@ function testXXHash () {
   xxhash.hash(Buffer.from(words.rnd()), 0xCAFEBABE)
 }
 
+function testFNV () {
+  fnv.hash32(words.rnd(), '1a').toHex()
+}
+
 const suite = new benchmark.Suite()
 
-suite.on('start', (e) => { process.stdout.write('Working...\n\n') })
+suite.on('start', (e) => { process.stdout.write('working...\n\n') })
 suite.on('cycle', (e) => { benchmarks.add(e.target) })
 suite.on('complete', () => { benchmarks.log() })
 
-suite.add('md5', { minSamples: 100, fn: testSHA })
+suite.add('crypto-sha1', { minSamples: 100, fn: testSHA })
 suite.add('xxhash', { minSamples: 100, fn: testXXHash })
+suite.add('dding-fnv', { minSamples: 100, fn: testFNV })
 
 suite.run({ async: false })

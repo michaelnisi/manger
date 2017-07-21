@@ -16,6 +16,7 @@
   "dependencies": {
     "beautify-benchmark": "^0.2.4",
     "benchmark": "^2.1.4",
+    "dding-fnv": "^1.0.1",
     "xxhash": "^0.2.4"
   }
 }
