@@ -12,20 +12,20 @@ const xxhash = require('xxhash')
 const words = fs.readFileSync('/usr/share/dict/words',
   { encoding: 'utf8' }
 ).split('\n')
-words.rnd = function () {
+words.random = function () {
   return this[Math.floor(Math.random() * this.length)]
 }
 
 function testSHA () {
-  crypto.createHash('sha1').update(words.rnd()).digest('hex')
+  crypto.createHash('sha1').update(words.random()).digest('hex')
 }
 
 function testXXHash () {
-  xxhash.hash(Buffer.from(words.rnd()), 0xCAFEBABE)
+  xxhash.hash(Buffer.from(words.random()), 0xCAFEBABE)
 }
 
 function testFNV () {
-  fnv.hash32(words.rnd(), '1a').toHex()
+  fnv.hash32(words.random(), '1a').toHex()
 }
 
 const suite = new benchmark.Suite()
