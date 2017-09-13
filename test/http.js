@@ -1,17 +1,16 @@
 'use strict'
 
-// http - test HTTP related things
-
-const StringDecoder = require('string_decoder').StringDecoder
 const common = require('./lib/common')
 const fs = require('fs')
+const http = require('http')
 const manger = require('../')
-const nock = require('nock')
 const path = require('path')
-const test = require('tap').test
+const { StringDecoder } = require('string_decoder')
+const { test } = require('tap')
+const url = require('url')
 
-test('request error', { skip: false }, t => {
-  nock('http://abc.de').get('/').replyWithError('shit happens')
+test('ENOTFOUND', t => {
+  t.plan(3)
 
   const store = common.freshManger()
   const feeds = store.feeds()
@@ -21,258 +20,419 @@ test('request error', { skip: false }, t => {
   feeds.on('end', () => {
     const found = dec.write(buf)
     t.is(found, '[]')
+    common.teardown(store, (er) => {
+      if (er) throw er
+      t.pass('should teardown')
+    })
   })
   feeds.on('readable', () => {
     let chunk
     while ((chunk = feeds.read())) { buf += chunk }
   })
   feeds.on('error', (er) => {
-    t.is(er.message, 'shit happens')
+    t.has(er, { code: 'ENOTFOUND', host: 'nowhere', port: 80 })
   })
 
-  t.plan(2)
-
-  const uri = 'http://abc.de/'
+  const uri = 'http://nowhere'
   const qry = manger.query(uri, null, null, true)
   feeds.end(qry)
 })
 
-test('ETag', { skip: false }, (t) => {
-  const scope = nock('http://feeds.5by5.tv')
+test('ETag', (t) => {
+  t.plan(19)
+
   const headers = {
     'content-type': 'text/xml; charset=UTF-8',
     'ETag': '55346232-18151'
   }
-  const mocks = [
+  const diffs = [
     { method: 'GET', code: 200 },
     { method: 'HEAD', code: 200 },
     { method: 'HEAD', code: 304 }
   ]
 
-  mocks.forEach((mock) => {
-    const h = (() => {
-      if (mock.method === 'GET') {
-        return scope.get('/b2w')
-      } else if (mock.method === 'HEAD') {
-        return scope.head('/b2w')
-      } else {
-        throw new Error('unhandled HTTP method')
-      }
-    })()
-    h.reply(mock.code, function (req, body) {
-      if (mock.method === 'GET') {
-        const p = path.join(__dirname, 'data', 'b2w.xml')
-        return fs.createReadStream(p)
-      } else if (mock.method === 'HEAD') {
+  const uri = url.parse('http://localhost:1337/b2w')
+
+  const fixtures = diffs.map((diff) => {
+    return (req, res) => {
+      t.is(req.url, uri.path, 'should hit correct URL')
+      t.is(req.method, diff.method, 'should use expected method')
+
+      res.writeHead(diff.code, headers)
+
+      if (diff.method === 'GET') {
         const wanted = {
           'accept': '*/*',
           'accept-encoding': 'gzip',
-          'host': 'feeds.5by5.tv',
-          'if-none-match': '55346232-18151',
-          'user-agent': `nodejs/${process.version}`
+          'host': 'localhost:1337',
+          'user-agent': `nodejs/${process.version}`,
+          'connection': 'close'
         }
-        const found = this.req.headers
-        t.same(found, wanted)
+        const found = req.headers
+        t.same(found, wanted, 'should send required headers')
+
+        const p = path.join(__dirname, 'data', 'b2w.xml')
+        fs.createReadStream(p).pipe(res)
+      } else if (diff.method === 'HEAD') {
+        const wanted = {
+          'accept': '*/*',
+          'accept-encoding': 'gzip',
+          'host': 'localhost:1337',
+          'if-none-match': '55346232-18151',
+          'user-agent': `nodejs/${process.version}`,
+          'connection': 'close'
+        }
+        const found = req.headers
+        t.same(found, wanted, 'should send required headers')
+
+        // TODO: Test HEAD timeout
+        // Not calling end here, leads to a test timeout.
+
+        res.end()
       } else {
         throw new Error('unhandled HTTP method')
       }
-    }, headers)
+    }
+  })
+
+  const server = http.createServer((req, res) => {
+    fixtures.shift()(req, res)
+  }).listen(1337, uri.hostname, (er) => {
+    if (er) throw er
+    t.pass('should listen on 1337')
+    go()
   })
 
   const store = common.freshManger()
-  const feeds = store.feeds()
 
-  t.plan(10)
+  const go = () => {
+    const feeds = store.feeds()
 
-  feeds.on('error', er => { t.fail('should not emit ' + er) })
-  let chunk
-  let chunks = ''
-  feeds.on('readable', () => {
-    while ((chunk = feeds.read()) !== null) {
-      chunks += chunk
-    }
-  })
-  feeds.on('finish', () => {
-    const found = JSON.parse(chunks)
-    // Forced queries only emit feeds that actually got updated.
-    t.is(found.length, 2)
-    const first = found[0]
-    found.forEach(feed => { t.same(first, feed) })
-    t.ok(scope.isDone())
-  })
-  const uri = 'http://feeds.5by5.tv/b2w'
-  const qry = manger.query(uri, null, null, true)
-  const queries = [uri, uri, qry, qry]
-  queries.forEach(q => { t.ok(feeds.write(q)) })
-  feeds.end()
+    feeds.on('error', er => { t.fail('should not err: ' + er) })
+    let chunk
+    let chunks = ''
+    feeds.on('readable', () => {
+      while ((chunk = feeds.read()) !== null) {
+        chunks += chunk
+      }
+    })
+    feeds.on('end', () => {
+      const found = JSON.parse(chunks)
+
+      // Forced queries only emit feeds that actually got updated, none in
+      // this case.
+      t.is(found.length, 2, 'should only emit unforced')
+
+      const first = found[0]
+      found.forEach(feed => { t.same(first, feed) })
+
+      server.close((er) => {
+        if (er) throw er
+        t.pass('should close server')
+        common.teardown(store, (er) => {
+          if (er) throw er
+          t.pass('should teardown')
+        })
+      })
+    })
+
+    const href = uri.href
+    const qry = manger.query(href, null, null, true)
+
+    // From the cache perspective, producing miss, hit, miss, miss; resulting
+    // in three requests.
+    const queries = [href, href, qry, qry]
+
+    queries.forEach(q => { t.ok(feeds.write(q), 'should accept write') })
+    feeds.end()
+  }
 })
 
-test('redirection of cached', { skip: false }, t => {
-  const scopes = [
-    nock('http://just'),
-    nock('http://some')
-  ]
-  const headers = {
-    'content-type': 'text/xml; charset=UTF-8',
-    'Location': 'http://some/ddc'
+test('301 while cached', t => {
+  const headers = { 'content-type': 'text/xml; charset=UTF-8' }
+  const createReadStream = (name) => {
+    const p = path.join(__dirname, 'data', name)
+    return fs.createReadStream(p)
   }
-  scopes[0].get('/b2w').reply(200, function () {
-    t.pass(200)
-    const p = path.join(__dirname, 'data', 'b2w.xml')
-    return fs.createReadStream(p)
-  }, headers)
-  scopes[0].get('/b2w').reply(301, function () {
-    t.pass(301)
-  }, headers)
-  scopes[1].get('/ddc').reply(200, function () {
-    t.pass(200)
-    const p = path.join(__dirname, 'data', 'ddc.xml')
-    return fs.createReadStream(p)
-  }, headers)
-  const cache = common.freshManger()
-  const x = Math.random() > 0.5
-  const s = x ? cache.feeds() : cache.entries()
 
-  t.plan(5)
+  const fixtures = [
+    (req, res) => {
+      t.is(req.url, '/b2w')
 
-  let buf = ''
-  s.on('data', (chunk) => {
-    buf += chunk
+      res.writeHead(200, headers)
+      createReadStream('b2w.xml').pipe(res)
+    },
+    (req, res) => {
+      t.is(req.url, '/b2w')
+
+      res.setHeader('Location', 'http://localhost:1337/ddc')
+      res.writeHead(301, headers)
+      createReadStream('b2w.xml').pipe(res)
+    },
+    (req, res) => {
+      t.is(req.url, '/ddc')
+
+      res.writeHead(200, headers)
+      createReadStream('ddc.xml').pipe(res)
+    }
+  ]
+
+  t.plan(9)
+
+  const server = http.createServer((req, res) => {
+    fixtures.shift()(req, res)
+  }).listen(1337, 'localhost', (er) => {
+    if (er) throw er
+    t.pass('should listen on port 1337')
+
+    const cache = common.freshManger()
+    const x = Math.random() > 0.5
+    const s = x ? cache.feeds() : cache.entries()
+
+    let buf = ''
+    s.on('data', (chunk) => {
+      buf += chunk
+    })
+    s.on('end', () => {
+      t.is(fixtures.length, 0)
+      JSON.parse(buf)
+
+      cache.has('http://localhost:1337/b2w', (er) => {
+        t.ok(er, 'should not be cached')
+      })
+      cache.has('http://localhost:1337/ddc', (er) => {
+        if (er) throw er
+        t.pass('should be cached')
+      })
+
+      server.close((er) => {
+        if (er) throw er
+        t.pass('should close server')
+
+        common.teardown(cache, (er) => {
+          if (er) throw er
+          t.pass('should teardown')
+        })
+      })
+    })
+    const uri = 'http://localhost:1337/b2w'
+    s.write(uri)
+    const q = manger.query(uri, null, null, true)
+    s.end(q)
   })
-  s.on('end', () => {
-    JSON.parse(buf)
-    scopes.forEach(scope => {
-      t.ok(scope.isDone(), 'scope should be done')
+})
+
+function done (server, cache, t, cb) {
+  server.close((er) => {
+    if (er) throw er
+    t.pass('should close server')
+    if (!cache) return cb ? cb() : null
+    common.teardown(cache, (er) => {
+      if (er) throw er
+      t.pass('should teardown')
+      if (cb) cb()
     })
   })
-  const uri = 'http://just/b2w'
-  s.write(uri)
-  const q = manger.query(uri, null, null, true)
-  s.end(q)
-})
+}
 
-test('HEAD 404', { skip: false }, t => {
-  const scope = nock('http://hello')
+test('HEAD 404', t => {
   const headers = {
     'content-type': 'text/xml; charset=UTF-8',
     'ETag': '55346232-18151'
   }
 
-  scope.get('/').reply(200, (req, body) => {
-    const p = path.join(__dirname, 'data', 'b2w.xml')
-    return fs.createReadStream(p)
-  }, headers)
-
-  scope.head('/').reply(304)
-  scope.head('/').reply(404)
-
-  // We cannot assume that the remote server is handling HEAD requests correctly,
-  // therefor we hit it again with a GET before emitting the error.
-  scope.get('/').reply(404)
-
-  const store = common.freshManger()
-  const feeds = store.feeds()
-  feeds.on('error', er => {
-    t.is(er.message, 'quaint HTTP status: 404 from hello')
-  })
-  let chunks = ''
-  feeds.on('readable', () => {
-    let chunk
-    while ((chunk = feeds.read()) !== null) {
-      chunks += chunk
+  const fixtures = [
+    (req, res) => {
+      t.is(req.method, 'GET')
+      t.is(req.url, '/b2w.xml')
+      res.writeHead(200, headers)
+      const p = path.join(__dirname, 'data', 'b2w.xml')
+      fs.createReadStream(p).pipe(res)
+    },
+    (req, res) => {
+      t.is(req.method, 'HEAD')
+      t.is(req.url, '/b2w.xml')
+      res.writeHead(304)
+      res.end()
+    },
+    (req, res) => {
+      t.is(req.method, 'HEAD')
+      t.is(req.url, '/b2w.xml')
+      res.writeHead(404)
+      res.end()
+    },
+    // We cannot assume that the remote server is handling HEAD requests
+    // correctly, thus we hit it again with a GET before emitting the error.
+    (req, res) => {
+      t.is(req.method, 'GET')
+      t.is(req.url, '/b2w.xml')
+      res.writeHead(404)
+      res.end()
     }
-  })
-  feeds.on('finish', () => {
-    JSON.parse(chunks)
-    t.ok(scope.isDone())
-  })
+  ]
 
-  t.plan(6)
+  const go = () => {
+    const store = common.freshManger()
+    const feeds = store.feeds()
+    feeds.on('error', er => {
+      t.is(er.message, 'quaint HTTP status: 404 from localhost:1337')
+    })
+    let chunks = ''
+    feeds.on('readable', () => {
+      let chunk
+      while ((chunk = feeds.read()) !== null) {
+        chunks += chunk
+      }
+    })
+    feeds.on('end', () => {
+      JSON.parse(chunks)
+      done(server, store, t)
+    })
 
-  const uri = 'http://hello/'
-  t.ok(feeds.write(uri))
-  t.ok(feeds.write(uri), 'should be cached')
+    const uri = 'http://localhost:1337/b2w.xml'
+    t.ok(feeds.write(uri))
+    t.ok(feeds.write(uri), 'should be cached')
 
-  const qry = manger.query(uri, null, null, true)
-  t.ok(feeds.write(qry))
-  t.ok(feeds.write(qry))
+    const qry = manger.query(uri, null, null, true)
+    t.ok(feeds.write(qry))
+    t.ok(feeds.write(qry))
 
-  feeds.end()
-})
-
-test('HEAD not found', { skip: false }, t => {
-  const scope = nock('http://hello')
-  const headers = {
-    'content-type': 'text/xml; charset=UTF-8',
-    'ETag': '55346232-18151'
+    feeds.end()
   }
 
-  scope.get('/').reply(200, (req, body) => {
-    nock.cleanAll()
-    const p = path.join(__dirname, 'data', 'b2w.xml')
-    return fs.createReadStream(p)
-  }, headers)
+  t.plan(16)
 
-  const store = common.freshManger()
-  const feeds = store.feeds()
-  feeds.on('error', er => {
-    t.is(er.message, 'getaddrinfo ENOTFOUND hello hello:80')
+  const server = http.createServer((req, res) => {
+    fixtures.shift()(req, res)
+  }).listen(1337, (er) => {
+    if (er) throw er
+    t.pass('should listen on 1337')
+    go()
   })
-  let chunks = ''
-  feeds.on('readable', () => {
-    let chunk
-    while ((chunk = feeds.read()) !== null) {
-      chunks += chunk
+})
+
+test('HEAD ECONNREFUSED', t => {
+  const go = () => {
+    const store = common.freshManger()
+    const feeds = store.feeds()
+
+    feeds.on('error', er => {
+      t.is(er.message, 'connect ECONNREFUSED 127.0.0.1:1337')
+    })
+
+    let chunks = ''
+
+    feeds.on('readable', () => {
+      if (chunks === '') { // first time
+        server.close((er) => {
+          if (er) throw er
+          t.pass('should close server')
+
+          const qry = manger.query(uri, null, null, true)
+          t.ok(feeds.write(qry))
+
+          feeds.end()
+        })
+      }
+
+      let chunk
+      while ((chunk = feeds.read()) !== null) {
+        chunks += chunk
+      }
+    })
+
+    feeds.on('end', () => {
+      JSON.parse(chunks)
+      common.teardown(store, (er) => {
+        if (er) throw er
+        t.pass('should teardown')
+      })
+    })
+
+    const uri = 'http://localhost:1337/b2w.xml'
+    t.ok(feeds.write(uri))
+  }
+
+  t.plan(9)
+
+  const server = http.createServer((req, res) => {
+    t.is(req.url, '/b2w.xml')
+    t.is(req.method, 'GET')
+
+    const headers = {
+      'content-type': 'text/xml; charset=UTF-8',
+      'ETag': '55346232-18151'
     }
+
+    res.writeHead(200, headers)
+
+    const p = path.join(__dirname, 'data', 'b2w.xml')
+    fs.createReadStream(p).pipe(res)
+  }).listen(1337, (er) => {
+    if (er) throw er
+    t.pass('should listen on 1337')
+    go()
   })
-  feeds.on('finish', () => {
-    JSON.parse(chunks)
-    t.ok(scope.isDone())
-  })
-
-  t.plan(4)
-
-  const uri = 'http://hello/'
-  t.ok(feeds.write(uri))
-
-  const qry = manger.query(uri, null, null, true)
-  t.ok(feeds.write(qry))
-
-  feeds.end()
 })
 
-test('HEAD request error during update', { skip: false }, t => {
-  const scope = nock('http://hello')
+test('HEAD socket hangup', t => {
+  const go = () => {
+    const store = common.freshManger()
+    const feeds = store.feeds()
+    feeds.on('error', (er) => {
+      t.is(er.message, 'socket hang up', 'should err twice')
+    })
+    feeds.on('end', () => {
+      done(server, store, t)
+    })
+
+    const uri = 'http://localhost:1337/b2w.xml'
+    t.ok(feeds.write(uri), 'should GET')
+    t.ok(feeds.write(uri), 'should hit cache')
+
+    const qry = manger.query(uri, null, null, true)
+    t.ok(feeds.write(qry))
+
+    feeds.end()
+    feeds.resume()
+  }
+
   const headers = {
     'content-type': 'text/xml; charset=UTF-8',
     'ETag': '55346232-18151'
   }
 
-  const p = path.join(__dirname, 'data', 'b2w.xml')
-  scope.get('/').replyWithFile(200, p, headers)
-  scope.head('/').replyWithError('oh shit')
-  scope.get('/').replyWithError('oh shit')
+  const fixtures = [
+    (req, res) => {
+      t.is(req.method, 'GET')
+      t.is(req.url, '/b2w.xml')
 
-  const store = common.freshManger()
+      res.writeHead(200, headers)
 
-  const feeds = store.feeds()
-  feeds.on('error', (er) => { t.is(er.message, 'oh shit', 'should err twice') })
-  feeds.on('end', () => { t.ok(scope.isDone()) })
+      const p = path.join(__dirname, 'data', 'b2w.xml')
+      fs.createReadStream(p).pipe(res)
+    },
+    (req, res) => {
+      t.is(req.method, 'HEAD')
+      t.is(req.url, '/b2w.xml')
 
-  t.plan(6)
+      res.destroy(new Error('oh shit'))
+    },
+    (req, res) => {
+      t.is(req.method, 'GET')
+      t.is(req.url, '/b2w.xml')
 
-  const uri = 'http://hello/'
-  t.ok(feeds.write(uri), 'should GET')
-  t.ok(feeds.write(uri), 'should hit cache')
+      res.destroy(new Error('oh shit'))
+    }
+  ]
 
-  const qry = manger.query(uri, null, null, true)
-  t.ok(feeds.write(qry))
+  t.plan(14)
 
-  feeds.end()
-  feeds.resume()
-})
-
-test('teardown', t => {
-  t.ok(!common.teardown())
-  t.end()
+  const server = http.createServer((req, res) => {
+    fixtures.shift()(req, res)
+  }).listen(1337, (er) => {
+    if (er) throw er
+    t.pass('should listen on 1337')
+    go()
+  })
 })

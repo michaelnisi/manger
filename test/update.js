@@ -1,65 +1,91 @@
 'use strict'
 
-var common = require('./lib/common')
-var fs = require('fs')
-var lino = require('lino')
-var nock = require('nock')
-var path = require('path')
-var stream = require('readable-stream')
-var test = require('tap').test
-var url = require('url')
+const common = require('./lib/common')
+const fs = require('fs')
+const http = require('http')
+const lino = require('lino')
+const path = require('path')
+const stream = require('readable-stream')
+const test = require('tap').test
+const url = require('url')
 
-test('not modified', function (t) {
+test('not modified', (t) => {
   t.plan(7)
-  var setup = new stream.Transform()
-  var headers = {
+
+  const go = () => {
+    const store = common.freshManger()
+    const feeds = store.feeds()
+    const p = path.join(__dirname, 'data', 'ALL')
+    const input = fs.createReadStream(p)
+    const update = () => {
+      const updated = store.update()
+      updated.on('error', (er) => {
+        throw er
+      })
+      updated.on('end', () => {
+        t.pass('should end update')
+
+        Object.keys(fixtures).forEach((key) => {
+          t.is(fixtures[key].length, 0, 'should hit all fixtures')
+        })
+
+        server.close((er) => {
+          if (er) throw er
+          t.pass('should close server')
+          common.teardown(store, (er) => {
+            if (er) throw er
+            t.pass('should teardown')
+          })
+        })
+      })
+      updated.resume()
+    }
+    feeds.on('finish', () => {
+      store.flushCounter((er) => {
+        if (er) throw er
+        t.pass('should flush counter')
+        update()
+      })
+    })
+
+    input.pipe(lino()).pipe(setup).pipe(feeds).resume()
+  }
+
+  const fixtures = {
+    'HEAD': [],
+    'GET': []
+  }
+
+  const server = http.createServer((req, res) => {
+    fixtures[req.method].shift()(req, res)
+  }).listen(1337, (er) => {
+    if (er) throw er
+    t.pass('should listen on 1337')
+    go()
+  })
+
+  const setup = new stream.Transform()
+  const headers = {
     'content-type': 'text/xml; charset=UTF-8',
     'ETag': '55346232-18151'
   }
-  var scopes = []
-  setup._transform = function (chunk, enc, cb) {
-    var uri = url.parse('' + chunk)
-    var u = uri.protocol + '//' + uri.host
-    var scope = nock(u)
-    scopes.push(scope)
-    var route = '/' + path.basename(url.format(uri))
-    var filename = route + '.xml'
-    scope.get(route).reply(200, function () {
-      var p = path.join(__dirname, 'data', filename)
-      return fs.createReadStream(p)
-    }, headers)
-    scope.head(route).reply(304, null, headers)
+  setup._transform = (chunk, enc, cb) => {
+    const uri = url.parse('' + chunk)
+    const route = '/' + path.basename(url.format(uri))
+    const filename = route + '.xml'
+
+    fixtures['GET'].push((req, res) => {
+      res.writeHead(200, headers)
+      const p = path.join(__dirname, 'data', filename)
+      fs.createReadStream(p).pipe(res)
+    })
+
+    fixtures['HEAD'].push((req, res) => {
+      res.writeHead(304, headers)
+      res.end()
+    })
+
     setup.push(chunk)
     cb()
   }
-  var store = common.freshManger()
-  var feeds = store.feeds()
-  var p = path.join(__dirname, 'data', 'ALL')
-  var input = fs.createReadStream(p)
-  function update () {
-    var updated = store.update()
-    updated.on('error', function (er) {
-      throw er
-    })
-    updated.on('end', function () {
-      t.pass('should end update')
-      scopes.forEach(function (scope) {
-        t.ok(scope.isDone(), 'should exhaust scope')
-      })
-    })
-    updated.resume()
-  }
-  feeds.on('finish', function () {
-    store.flushCounter(function (er) {
-      if (er) throw er
-      t.pass('should flush counter')
-      update()
-    })
-  })
-  input.pipe(lino()).pipe(setup).pipe(feeds).resume()
-})
-
-test('teardown', function (t) {
-  t.ok(!common.teardown())
-  t.end()
 })

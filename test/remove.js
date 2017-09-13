@@ -1,39 +1,57 @@
 'use strict'
 
-var common = require('./lib/common')
-var fs = require('fs')
-var nock = require('nock')
-var path = require('path')
-var test = require('tap').test
+const common = require('./lib/common')
+const fs = require('fs')
+const http = require('http')
+const path = require('path')
+const test = require('tap').test
 
-var cache = common.freshManger()
+const cache = common.freshManger()
 
-test('setup', function (t) {
-  t.plan(1)
-  var scope = nock('http://just')
-  var headers = {
-    'content-type': 'text/xml; charset=UTF-8',
-    'ETAG': '55346232-18151'
+test('setup', (t) => {
+  t.plan(4)
+
+  const go = () => {
+    const feeds = cache.feeds()
+
+    let buf = ''
+    feeds.on('data', function (chunk) {
+      buf += chunk
+    })
+    feeds.on('end', function () {
+      JSON.parse(buf)
+      t.pass('feed cached')
+
+      server.close((er) => {
+        if (er) throw er
+        t.pass('should close server')
+      })
+    })
+    feeds.end('http://localhost:1337/b2w')
   }
-  scope.get('/b2w').reply(200, function () {
-    var p = path.join(__dirname, 'data', 'b2w.xml')
-    return fs.createReadStream(p)
-  }, headers)
-  var feeds = cache.feeds()
-  var buf = ''
-  feeds.on('data', function (chunk) {
-    buf += chunk
+
+  const server = http.createServer((req, res) => {
+    t.is(req.url, '/b2w')
+
+    const headers = {
+      'content-type': 'text/xml; charset=UTF-8',
+      'ETAG': '55346232-18151'
+    }
+
+    res.writeHead(200, headers)
+
+    const p = path.join(__dirname, 'data', 'b2w.xml')
+    fs.createReadStream(p).pipe(res)
+  }).listen(1337, (er) => {
+    if (er) throw er
+    t.pass('should listen on 1337')
+    go()
   })
-  feeds.on('end', function () {
-    JSON.parse(buf)
-    t.pass('feed cached')
-  })
-  feeds.end('http://just/b2w')
 })
 
 test('rank', t => {
   const feeds = cache.feeds()
-  const uri = 'http://just/b2w'
+  const uri = 'http://localhost:1337/b2w'
   feeds.end(uri)
   feeds.on('end', () => {
     cache.flushCounter(er => {
@@ -52,7 +70,7 @@ test('rank', t => {
 
 test('remove', t => {
   t.plan(3)
-  const uri = 'http://just/b2w'
+  const uri = 'http://localhost:1337/b2w'
 
   cache.has(uri, er => {
     if (er) throw er
@@ -75,6 +93,8 @@ test('remove', t => {
 })
 
 test('teardown', t => {
-  t.ok(!common.teardown())
-  t.end()
+  common.teardown(cache, (er) => {
+    if (er) throw er
+    t.end()
+  })
 })

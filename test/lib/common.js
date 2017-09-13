@@ -4,35 +4,29 @@ exports.freshDB = freshDB
 exports.freshManger = freshManger
 exports.teardown = teardown
 
-var assert = require('assert')
-var manger = require('../../')
-var rimraf = require('rimraf')
-var levelup = require('levelup')
+const levelup = require('levelup')
+const manger = require('../../')
+const rimraf = require('rimraf')
 
 function freshName () {
   return '/tmp/manger-' + Math.floor(Math.random() * (1 << 24))
 }
 
-var db
-
 function freshDB () {
-  assert(!teardown())
-  var name = freshName()
-  db = levelup(name)
-  return db
+  const name = freshName()
+  return levelup(name)
 }
 
 function freshManger (opts) {
-  assert(!teardown())
-  var name = freshName()
-  var svc = manger(name, opts)
-  db = svc.db
-  return svc
+  const name = freshName()
+  return manger(name, opts)
 }
 
-function teardown () {
-  if (db) {
-    db.close()
-    return rimraf.sync(db.location)
-  }
+function teardown (cache, cb) {
+  const db = cache.db
+  const p = db.location
+  rimraf(p, (er) => {
+    if (cb) return cb(er)
+    if (er) throw er
+  })
 }

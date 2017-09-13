@@ -18,16 +18,15 @@ test('URLs', (t) => {
 test('empty list', (t) => {
   const store = common.freshManger()
   const urls = store.list()
-  t.plan(2)
+  t.plan(3)
   urls.on('readable', () => {
     t.is(urls.read(), null, 'should become readable')
   })
   urls.on('end', () => {
-    t.ok(true, 'should end')
+    t.pass('should end')
+    common.teardown(store, (er) => {
+      if (er) throw er
+      t.pass('should teardown')
+    })
   })
-})
-
-test('teardown', (t) => {
-  t.ok(!common.teardown())
-  t.end()
 })

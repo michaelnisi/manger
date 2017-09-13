@@ -65,7 +65,7 @@ An individual entry.
 
 ### query()
 
-A query to get a feed or entries of a feed in a time range between `Date.now()` and `since`.
+A query to get a feed or entries of a feed in a time range between `Date.now()` and `since`. Conceptually consequent, but semantically inaccurate, the `since` date is exclusive. If you pass the `updated` date of the latest entry received, this entry will not be included in the response.
 
 - `url` `String()`
 - `since` [`Date()`](https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Global_Objects/Date) `| void()`

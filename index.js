@@ -222,8 +222,8 @@ MangerTransform.prototype.head = function (qry, cb) {
 // A String used to cache failed requests. The `method` is necessary to
 // differentiate `GET` and `HEAD` requests.
 function failureKey (method, uri) {
-  assert(typeof method === 'string', 'expected string')
-  assert(typeof uri === 'string', 'expected string')
+  assert(typeof method === 'string', `expected string: ${method}`)
+  assert(typeof uri === 'string', `expected string: ${uri}`)
   return method + '-' + uri
 }
 

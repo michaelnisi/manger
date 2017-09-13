@@ -1,36 +1,36 @@
 'use strict'
 
-var common = require('./lib/common')
-var test = require('tap').test
+const common = require('./lib/common')
+const test = require('tap').test
 
-test('queries and requests', function (t) {
-  function go (s, t) {
-    var found = []
-    s.on('error', function (er) {
+test('queries and requests', (t) => {
+  function go (s, t, cb) {
+    const found = []
+    s.on('error', (er) => {
       found.push(er)
     })
 
-    var buf = ''
-    s.on('readable', function () {
-      var chunk
+    let buf = ''
+    s.on('readable', () => {
+      let chunk
       while ((chunk = s.read()) !== null) { buf += chunk }
     })
     // Failed requests are cached, an error is emitted only for the first
     // failure per URL. Invalid queries do not produce requests, so errors
     // are emitted for each of those.
-    var wanted = [
+    const wanted = [
       'invalid query',
       'getaddrinfo ENOTFOUND',
       'invalid query',
       'invalid protocol'
     ]
-    s.on('finish', function () {
+    s.on('finish', () => {
       t.same(JSON.parse(buf), [])
       t.is(found.length, wanted.length)
-      wanted.forEach(function (it) {
+      wanted.forEach((it) => {
         t.ok(found.shift().message.match(new RegExp(it)))
       })
-      t.end()
+      cb()
     })
 
     t.ok(s.write('abc'))
@@ -41,20 +41,27 @@ test('queries and requests', function (t) {
     s.end()
   }
 
-  t.plan(2)
-  t.test('feeds', function (t) {
-    var store = common.freshManger()
-    var feeds = store.feeds()
-    go(feeds, t)
-  })
-  t.test('entries', function (t) {
-    var store = common.freshManger()
-    var entries = store.entries()
-    go(entries, t)
-  })
-})
+  t.plan(2, 'same tests for feeds and entries')
 
-test('teardown', function (t) {
-  t.ok(!common.teardown())
-  t.end()
+  const teardown = (t, cache) => {
+    return (er) => {
+      if (er) throw er
+      common.teardown(cache, (er) => {
+        if (er) throw er
+        t.end()
+      })
+    }
+  }
+
+  t.test('feeds', (t) => {
+    const cache = common.freshManger()
+    const feeds = cache.feeds()
+    go(feeds, t, teardown(t, cache))
+  })
+
+  t.test('entries', (t) => {
+    const cache = common.freshManger()
+    const entries = cache.entries()
+    go(entries, t, teardown(t, cache))
+  })
 })

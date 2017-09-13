@@ -2,43 +2,43 @@
 
 const StringDecoder = require('string_decoder').StringDecoder
 const common = require('./lib/common')
-const nock = require('nock')
-const test = require('tap').test
+const http = require('http')
+const t = require('tap')
+const test = t.test
 
 const cache = common.freshManger()
-const decoder = new StringDecoder('utf8')
-
-const a = 'http://first.ly/feed'
-const b = 'http://second.ly/feed'
-
-const scopes = [
-  nock('http://first.ly'),
-  nock('http://second.ly')
-]
-
-test('setup', (t) => {
-  const headers = {
-    'content-type': 'text/xml; charset=UTF-8',
-    'ETag': '55346232-18151',
-    'Location': 'http://second.ly/feed'
-  }
-  scopes[0].get('/feed').reply(301, () => {
-  }, headers)
-  scopes[1].get('/feed').reply(200, () => {
-    return '<rss><channel>' +
-      '<item><pubDate>0</pubDate><title>Riley</title></item>' +
-      '</channel></rss>'
-  })
-  scopes[1].get('/feed').reply(200, () => {
-    return '<rss><channel>' +
-      '<item><pubDate>0</pubDate><title>Riley</title></item>' +
-      '<item><pubDate>1</pubDate><title>Sun</title></item>' +
-      '</channel></rss>'
-  })
-  t.end()
-})
+const decoder = new StringDecoder()
 
 test('first request', (t) => {
+  t.plan(8)
+
+  const a = http.createServer((req, res) => {
+    t.pass()
+
+    res.setHeader('ETag', '55346232-18151')
+    res.setHeader('Location', 'http://localhost:1338')
+
+    res.writeHead(301, { 'Content-Type': 'text/xml; charset=UTF-8' })
+    res.end('ok')
+  }).listen(1337, 'localhost', () => {
+    t.pass()
+  })
+
+  const b = http.createServer((req, res) => {
+    t.pass()
+
+    res.writeHead(200, { 'Content-Type': 'text/xml; charset=UTF-8' })
+    res.end(`<rss>
+              <channel>
+                <item>
+                  <pubDate>0</pubDate><title>Riley</title>
+                </item>
+              </channel>
+            </rss>`)
+  }).listen(1338, 'localhost', () => {
+    t.pass()
+  })
+
   const s = cache.entries()
 
   let buf = ''
@@ -48,13 +48,16 @@ test('first request', (t) => {
 
   s.on('end', () => {
     JSON.parse(buf).forEach(({ url, originalURL }) => {
-      t.is(originalURL, a)
-      t.is(url, b)
+      // TODO: Remove trailing slashes
+      t.is(originalURL, 'http://localhost:1337/')
+      t.is(url, 'http://localhost:1338/')
     })
-    t.end()
+
+    a.close(() => { t.pass() })
+    b.close(() => { t.pass() })
   })
 
-  s.end(a)
+  s.end('http://localhost:1337')
 })
 
 test('list', (t) => {
@@ -65,12 +68,12 @@ test('list', (t) => {
   })
   s.on('end', () => {
     t.is(uris.length, 1)
-    t.is(uris[0], b)
+    t.is(uris[0], 'http://localhost:1338/')
     t.end()
   })
 })
 
-test('update without flushing first ends', (t) => {
+test('update, without flushing first, ends', (t) => {
   const s = cache.update()
 
   s.on('data', (chunk) => { t.fail() })
@@ -86,6 +89,26 @@ test('flush counter', (t) => {
 })
 
 test('update', (t) => {
+  t.plan(5)
+
+  const b = http.createServer((req, res) => {
+    t.pass()
+
+    res.writeHead(200, { 'Content-Type': 'text/xml; charset=UTF-8' })
+    res.end(`<rss>
+              <channel>
+                <item>
+                  <pubDate>0</pubDate><title>Riley</title>
+                </item>
+                <item>
+                  <pubDate>1</pubDate><title>Sun</title>
+                </item>
+              </channel>
+            </rss>`)
+  }).listen(1338, 'localhost', () => {
+    t.pass()
+  })
+
   const s = cache.update()
 
   let found = []
@@ -97,9 +120,9 @@ test('update', (t) => {
     t.is(found.length, 1)
 
     const feed = found[0]
-    t.is(feed.url, b)
+    t.is(feed.url, 'http://localhost:1338/')
 
-    t.end()
+    b.close(() => { t.pass() })
   })
 })
 
@@ -117,8 +140,8 @@ test('updated entries', (t) => {
     t.is(entries.length, 2)
 
     entries.forEach(({ url, originalURL }) => {
-      t.is(originalURL, a)
-      t.is(url, b)
+      t.is(originalURL, 'http://localhost:1337/')
+      t.is(url, 'http://localhost:1338/')
     })
 
     const titles = ['Riley', 'Sun']
@@ -127,7 +150,7 @@ test('updated entries', (t) => {
     t.end()
   })
 
-  s.end(a)
+  s.end('http://localhost:1337')
 })
 
 test('list', (t) => {
@@ -138,7 +161,7 @@ test('list', (t) => {
   })
   s.on('end', () => {
     t.is(uris.length, 1)
-    t.is(uris[0], b)
+    t.is(uris[0], 'http://localhost:1338/')
     t.end()
   })
 })
@@ -157,13 +180,13 @@ test('feeds', (t) => {
     t.is(feeds.length, 1)
 
     const feed = feeds[0]
-    t.is(feed.originalURL, a)
-    t.is(feed.url, b)
+    t.is(feed.originalURL, 'http://localhost:1337/')
+    t.is(feed.url, 'http://localhost:1338/')
 
     t.end()
   })
 
-  s.end(a)
+  s.end('http://localhost:1337/')
 })
 
 test('flush counter', (t) => {
@@ -186,14 +209,15 @@ test('ranks', (t) => {
     t.is(urls.length, 1)
 
     const url = urls[0]
-    t.is(url, b)
+    t.is(url, 'http://localhost:1338/')
 
     t.end()
   })
 })
 
 test('teardown', (t) => {
-  scopes.forEach((scope) => { t.ok(scope.isDone()) })
-  t.ok(!common.teardown())
-  t.end()
+  common.teardown(cache, (er) => {
+    if (er) throw er
+    t.end()
+  })
 })

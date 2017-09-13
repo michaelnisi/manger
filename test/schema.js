@@ -1,13 +1,12 @@
 'use strict'
 
-var bytewise = require('bytewise')
-var common = require('./lib/common')
-var schema = require('../lib/schema')
-var test = require('tap').test
+const bytewise = require('bytewise')
+const schema = require('../lib/schema')
+const test = require('tap').test
 
 function is (found, wanted, t) {
   wanted.forEach(function (it) {
-    var that = bytewise.decode(found.shift())
+    const that = bytewise.decode(found.shift())
     t.same(that, it)
   })
   t.is(found.length, 0)
@@ -15,14 +14,14 @@ function is (found, wanted, t) {
 }
 
 test('rank', function (t) {
-  var f = schema.rank
+  const f = schema.rank
   t.throws(function () { f('http://abc.de/') })
   t.throws(function () { f('http://abc.de/', 'joker') })
-  var wanted = [
+  const wanted = [
     ['manger', ['rank', 1, 'http://abc.de/']],
     ['manger', ['rank', 3, 'http://abc.de/']]
   ]
-  var found = [
+  const found = [
     f('http://abc.de', 1),
     f('http://abc.de/', 3)
   ]
@@ -30,14 +29,14 @@ test('rank', function (t) {
 })
 
 test('entry', function (t) {
-  var f = schema.entry
+  const f = schema.entry
   t.throws(function () { f('http://abc.de/', new Date()) })
-  var ts = Date.now()
-  var wanted = [
+  const ts = Date.now()
+  const wanted = [
     ['manger', ['entry', 'http://abc.de/', 0, null]],
     ['manger', ['entry', 'http://abc.de/', ts, null]]
   ]
-  var found = [
+  const found = [
     f('http://abc.de'),
     f('http://abc.de/', ts)
   ]
@@ -45,8 +44,8 @@ test('entry', function (t) {
 })
 
 test('entries', function (t) {
-  var f = schema.entries
-  var wanted = [
+  const f = schema.entries
+  const wanted = [
     { gt: ['manger', ['entry', 'http://abc.de/', 0, null]],
       lte: ['manger', ['entry', 'http://abc.de/', Infinity, null]],
       fillCache: false
@@ -56,13 +55,13 @@ test('entries', function (t) {
       fillCache: true
     }
   ]
-  var found = [
+  const found = [
     f('http://abc.de'),
     f('http://abc.de', 3600, true)
   ]
   t.plan(wanted.length)
   found.forEach(function (it) {
-    var d = {
+    const d = {
       gt: bytewise.decode(it.gt),
       lte: bytewise.decode(it.lte),
       fillCache: it.fillCache
@@ -72,12 +71,12 @@ test('entries', function (t) {
 })
 
 test('etag', function (t) {
-  var f = schema.etag
-  var wanted = [
+  const f = schema.etag
+  const wanted = [
     ['manger', ['etag', 'http://abc.de/']],
     ['manger', ['etag', 'http://abc.de/']]
   ]
-  var found = [
+  const found = [
     f('http://abc.de'),
     f('http://abc.de/')
   ]
@@ -85,19 +84,14 @@ test('etag', function (t) {
 })
 
 test('feed', function (t) {
-  var f = schema.feed
-  var wanted = [
+  const f = schema.feed
+  const wanted = [
     ['manger', ['feed', 'http://abc.de/']],
     ['manger', ['feed', 'http://abc.de/']]
   ]
-  var found = [
+  const found = [
     f('http://abc.de'),
     f('http://abc.de/')
   ]
   is(found, wanted, t).end()
-})
-
-test('teardown', function (t) {
-  t.ok(!common.teardown())
-  t.end()
 })

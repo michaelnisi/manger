@@ -14,13 +14,17 @@ function QueryCount (uri, count) {
 }
 
 test('allFeeds', { skip: false }, (t) => {
-  const db = common.freshManger().db
+  const cache = common.freshManger()
+  const db = cache.db
+
   const uris = ['abc', 'def', 'ghi']
   const ops = uris.map(uri => {
     const key = schema.feed(uri)
     return { type: 'put', key: key, value: '{}' }
   })
-  t.plan(1)
+
+  t.plan(2)
+
   db.batch(ops, (er) => {
     if (er) throw er
     const f = rank.allFeeds
@@ -28,6 +32,11 @@ test('allFeeds', { skip: false }, (t) => {
       if (er) throw er
       const wanted = uris
       t.same(found, wanted)
+
+      common.teardown(cache, (er) => {
+        if (er) throw er
+        t.pass('should teardown')
+      })
     })
   })
 })
@@ -52,8 +61,11 @@ test('rank', (t) => {
     ops.push(op)
   })
 
-  const db = common.freshManger().db
-  t.plan(4)
+  const store = common.freshManger()
+  const db = store.db
+
+  t.plan(5)
+
   db.batch(ops, (er) => {
     if (er) throw er
     t.pass('batch applied callback')
@@ -79,12 +91,12 @@ test('rank', (t) => {
       })
       s.on('end', () => {
         t.same(found, wanted)
+
+        common.teardown(store, (er) => {
+          if (er) throw er
+          t.pass('should teardown')
+        })
       })
     })
   })
-})
-
-test('teardown', (t) => {
-  t.ok(!common.teardown())
-  t.end()
 })

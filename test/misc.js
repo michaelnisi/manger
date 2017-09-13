@@ -98,9 +98,9 @@ test('process query', function (t) {
   var mf = new Surrogate(true)
   var found = [
     f(m, 'abc'),
-    f(m, new Buffer('abc')),
+    f(m, Buffer.from('abc')),
     f(mf, 'abc'),
-    f(mf, new Buffer('abc'))
+    f(mf, Buffer.from('abc'))
   ]
   t.plan(wanted.length)
   wanted.forEach(function (it) {
