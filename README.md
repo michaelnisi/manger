@@ -63,7 +63,7 @@ An individual entry.
 - `updated` `str()`
 - `url` `str()` The URL of this entry’s feed.
 
-Why does **manger** use cryptographic hash algorithm, SHA-1, to produce the `id` property?
+Why SHA-1, cryptographic hashing, to produce the `id` property?
 
 > Having a good hash is good for being able to trust your data, it happens to have some other good features, too, it means when we hash objects, we know the hash is well distributed and we do not have to worry about certain distribution issues.
 
