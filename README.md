@@ -63,6 +63,12 @@ An individual entry.
 - `updated` `str()`
 - `url` `str()` The URL of this entry’s feed.
 
+Why does **manger** use cryptographic hash algorithm, SHA-1, to produce the `id` property?
+
+> Having a good hash is good for being able to trust your data, it happens to have some other good features, too, it means when we hash objects, we know the hash is well distributed and we do not have to worry about certain distribution issues.
+
+Read more [here](https://stackoverflow.com/questions/28792784/why-does-git-use-a-cryptographic-hash-function).
+
 ### query()
 
 A query to get a feed or entries of a feed in a time range between `Date.now()` and `since`. Conceptually consequent, but semantically inaccurate, the `since` date is exclusive. If you pass the `updated` date of the latest entry received, this entry will not be included in the response.
