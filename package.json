@@ -1,6 +1,6 @@
 {
   "name": "manger",
-  "version": "6.1.5",
+  "version": "6.2.0",
   "description": "cache feeds",
   "main": "index.js",
   "scripts": {
@@ -23,7 +23,7 @@
     "cache"
   ],
   "engines": {
-    "node": ">=6"
+    "node": ">=7"
   },
   "license": "MIT",
   "homepage": "https://github.com/michaelnisi/manger",
@@ -41,9 +41,9 @@
   "devDependencies": {
     "lino": "^1.0.0",
     "rimraf": "^2.6.1",
-    "standard": "^10.0.2",
+    "standard": "^10.0.3",
     "stread": "^1.0.0",
-    "tap": "^10.7.2"
+    "tap": "^11.0.1"
   },
   "author": "Michael Nisi <michael.nisi@gmail.com> (https://troubled.pro/)",
   "directories": {

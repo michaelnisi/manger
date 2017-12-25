@@ -90,3 +90,39 @@ test('html', (t) => {
   t.plan(wanted.length)
   wanted.forEach(item => { t.same(found.shift(), item) })
 })
+
+test('entry link', (t) => {
+  const f = strings.entryLink
+
+  const a = 'http://abc.de/fgh'
+  const b = 'http://abc.de/fgh.html'
+  const c = 'http://abc.de/fgh.htm'
+
+  const wanted = [
+    null,
+    null,
+    a,
+    b,
+    c,
+    null,
+    null,
+    null,
+    null,
+    null
+  ]
+  const found = [
+    f(),
+    f({}),
+    f({ link: a }),
+    f({ link: b }),
+    f({ link: c }),
+    f({ link: a, enclosure: { url: a } }),
+    f({ link: b, enclosure: { url: b } }),
+    f({ link: c, enclosure: { url: c } }),
+    f({ link: 'http://abc.de/fgh.mp3' }),
+    f({ link: 'abc.def' })
+  ]
+
+  t.plan(wanted.length)
+  wanted.forEach(item => { t.same(found.shift(), item) })
+})

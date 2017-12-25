@@ -1,5 +1,7 @@
 'use strict'
 
+// TODO: Reduce timeout
+
 const assert = require('assert')
 const common = require('./lib/common')
 const debug = require('util').debuglog('manger')

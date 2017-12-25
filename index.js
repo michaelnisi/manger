@@ -558,6 +558,7 @@ MangerTransform.prototype.parse = function (qry, res, cb) {
     entry.summary = strings.html(entry.summary)
     entry.duration = strings.duration(entry.duration)
     entry.id = strings.entryID(entry)
+    entry.link = strings.entryLink(entry)
 
     if (typeof entry.id !== 'string' || !this.isEntry(entry)) {
       debug('invalid entry: %s', entry.url)
