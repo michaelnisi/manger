@@ -63,34 +63,6 @@ test('duration', (t) => {
   })
 })
 
-test('html', (t) => {
-  const f = strings.html
-  const wanted = [
-    null,
-    null,
-    null,
-    '',
-    '<h1>Headlines are fine</h1>',
-    '<h1>Headline are fine</h1><p>Paragraphs too</p>',
-    '<h1>Headline are fine</h1><p>Paragraphs too, but no images</p>',
-    'no tables',
-    '<br />self closing<br />'
-  ]
-  const found = [
-    f(),
-    f(null),
-    f(0),
-    f(''),
-    f('<h1>Headlines are fine</h1>'),
-    f('<h1>Headline are fine</h1><p>Paragraphs too</p>'),
-    f('<h1>Headline are fine</h1><p>Paragraphs too, <img>but no images</img></p>'),
-    f('<table>no tables<table>'),
-    f('<br>self closing<br>')
-  ]
-  t.plan(wanted.length)
-  wanted.forEach(item => { t.same(found.shift(), item) })
-})
-
 test('entry link', (t) => {
   const f = strings.entryLink
 
