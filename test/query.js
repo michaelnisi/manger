@@ -103,10 +103,12 @@ test('request', (t) => {
 
 test('redirect', t => {
   const found = [
-    query('http://abc.de').redirect(301, 'http://fgh.ij')
+    query('http://abc.de').redirect(301, 'http://fgh.ij'),
+    query('http://abc.de').redirect(301, 'fgh.ij')
   ]
   const wanted = [
-    query('http://fgh.ij', 0, null, false, 301, 1, 'http://abc.de')
+    query('http://fgh.ij', 0, null, false, 301, 1, 'http://abc.de'),
+    null
   ]
   // --
   for (let it of wanted) {
