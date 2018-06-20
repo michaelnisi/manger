@@ -533,6 +533,7 @@ MangerTransform.prototype.parse = function (qry, res, cb) {
     feed.originalURL = originalURL
 
     feed.updated = Math.max(time(feed), 1)
+    feed.summary = strings.html(feed.summary)
 
     if (!this.isFeed(feed)) {
       debug('invalid feed: %s', feed.url)
