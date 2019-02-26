@@ -995,7 +995,7 @@ function Manger (name, opts) {
     } else {
       return db
     }
-  }})
+  } })
 }
 util.inherits(Manger, events.EventEmitter)
 
