@@ -3,7 +3,20 @@
 var base = require('../lib/streams_base')
 var manger = require('../')
 var stringDecoder = require('string_decoder')
-var test = require('tap').test
+
+const { test } = require('tap')
+const { freshManger } = require('./lib/common')
+
+test('closed database', (t) => {
+  const cache = freshManger()
+
+  t.plan(1)
+  cache.db.close(er => {
+    t.throws(() => {
+      t.ok(cache.db.isClosed)
+    })
+  })
+})
 
 test('charset from response', function (t) {
   var f = base.charsetFromResponse
