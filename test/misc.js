@@ -1,11 +1,12 @@
 'use strict'
 
+var base = require('../lib/streams_base')
 var manger = require('../')
 var stringDecoder = require('string_decoder')
 var test = require('tap').test
 
 test('charset from response', function (t) {
-  var f = manger.charsetFromResponse
+  var f = base.charsetFromResponse
   function res (str) {
     return {
       headers: {
@@ -32,28 +33,8 @@ test('charset from response', function (t) {
   })
 })
 
-test('redirect', function (t) {
-  var f = manger.redirect
-  var wanted = [
-    false,
-    true,
-    true,
-    false
-  ]
-  var found = [
-    f(200),
-    f(300),
-    f(399),
-    f(400)
-  ]
-  t.plan(wanted.length)
-  wanted.forEach(function (it) {
-    t.is(found.shift(), it)
-  })
-})
-
 test('failure keys', function (t) {
-  var f = manger.failureKey
+  var f = base.failureKey
   t.throws(function () { f() })
   t.throws(function () { f(null) })
   t.throws(function () { f(123) })
@@ -63,7 +44,7 @@ test('failure keys', function (t) {
 })
 
 test('compare etags', function (t) {
-  var f = manger.sameEtag
+  var f = base.sameEtag
   var wanted = [
     false,
     false,
@@ -83,7 +64,7 @@ test('compare etags', function (t) {
 })
 
 test('process query', function (t) {
-  var f = manger.processQuery
+  var f = base.processQuery
   var wanted = [
     manger.query('abc'),
     manger.query('abc'),
@@ -109,7 +90,7 @@ test('process query', function (t) {
 })
 
 test('newer', function (t) {
-  var f = manger.newer
+  var f = base.newer
   var wanted = [
     true,
     true,

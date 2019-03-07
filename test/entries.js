@@ -5,7 +5,6 @@
 const assert = require('assert')
 const common = require('./lib/common')
 const debug = require('util').debuglog('manger')
-const es = require('../lib/entries')
 const fs = require('fs')
 const http = require('http')
 const manger = require('../')
@@ -255,8 +254,8 @@ test('entry updating', (t) => {
       'bc8ac87954ac6cc46cf4f382e5fe2eb9ef904c1c'
     ]
 
-    t.same(es.titles(entries), ['Mercury', 'Venus'])
-    t.same(es.ids(entries), wanted)
+    t.same(entries.map(e => e.title), ['Mercury', 'Venus'])
+    t.same(entries.map(e => e.id), wanted)
 
     // TODO: Write test for passing invalid urls
     store.has(id, (er) => {
@@ -266,8 +265,8 @@ test('entry updating', (t) => {
         const update = store.update()
         update.on('end', () => {
           read(store.entries(), id, (entries) => {
-            t.same(es.titles(entries), ['Mercury', 'Earth'])
-            t.same(es.ids(entries), wanted)
+            t.same(entries.map(e => e.title), ['Mercury', 'Earth'])
+            t.same(entries.map(e => e.id), wanted)
             common.teardown(store, (er) => {
               if (er) throw er
               server.close((er) => {
