@@ -17,12 +17,13 @@ const { inherits, debuglog } = require('util')
 const debug = debuglog('manger')
 
 exports.Entries = Entries
+exports.FeedURLs = FeedURLs
 exports.Feeds = Feeds
 exports.Opts = Opts
 exports.Queries = query.Queries
 exports.URLs = URLs
 exports.query = query
-exports.FeedURLs = FeedURLs
+exports.Manger = Manger
 
 // Creates a new Manger cache, the API of this package.
 //
