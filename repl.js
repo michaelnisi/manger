@@ -1,12 +1,13 @@
 #!/usr/bin/env node
+'use strict'
 
 // repl - explore manger
 
 const fs = require('fs')
 const lino = require('lino')
-const { Manger } = require('./')
 const repl = require('repl')
-const { inspect } = require('util')
+const { Manger } = require('./')
+const { clear, dir, log } = require('console')
 
 const name = process.argv[2] || '/tmp/manger-repl'
 const cache = new Manger(name, { objectMode: true })
@@ -19,9 +20,8 @@ const server = repl.start({
   useColors: true
 })
 
+// Prints objects, or one of their properties, read from stream.
 function read (s, prop) {
-  const { log } = console
-
   s.once('error', er => {
     log(er)
   }).on('readable', () => {
@@ -29,33 +29,25 @@ function read (s, prop) {
     while ((obj = s.read()) !== null) {
       let item = prop ? obj[prop] : obj
 
-      log(inspect(item, { colors: true }))
+      dir(item, { colors: true })
     }
   }).on('end', () => {
-    console.log('ok')
+    s.removeAllListeners()
+    log('ok')
     server.displayPrompt()
   })
 }
 
 // Fills the cache with some feeds.
-function fill () {
-  const lines = lino()
-  let ok = true
-
-  function _read () {
-    let chunk
-    while (ok && (chunk = lines.read()) !== null) {
-      ok = feeds.write(chunk)
-    }
-    if (!ok) feeds.once('drain', _read)
-  }
-
-  lines.on('readable', _read)
-  fs.createReadStream('./test/data/feeds').pipe(lines)
+function fill (prop = 'title') {
+  read(fs.createReadStream('./test/data/feeds')
+    .pipe(lino())
+    .pipe(cache.feeds()), prop)
 }
 
-const { context } = server
+const { context } = server
 
+context.clear = clear
 context.fill = fill
 context.read = read
 
@@ -64,4 +56,3 @@ Object.getOwnPropertyNames(Manger.prototype).forEach(name => {
   if (name === 'constructor' || typeof f !== 'function') return
   context[name] = f.bind(cache)
 })
-
