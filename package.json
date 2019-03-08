@@ -1,6 +1,6 @@
 {
   "name": "manger",
-  "version": "6.4.4",
+  "version": "6.4.5",
   "description": "cache feeds",
   "main": "index.js",
   "scripts": {
@@ -45,7 +45,7 @@
     "stread": "^1.0.0",
     "tap": "^12.5.3"
   },
-  "author": "Michael Nisi <michael.nisi@gmail.com> (https://troubled.pro/)",
+  "author": "Michael Nisi (https://troubled.pro/)",
   "directories": {
     "test": "test"
   }
