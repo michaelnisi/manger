@@ -4,8 +4,8 @@
 // repl - explore manger
 
 const fs = require('fs')
-const lino = require('lino')
 const repl = require('repl')
+const split = require('binary-split')
 const { Manger } = require('./')
 const { clear, dir, log } = require('console')
 
@@ -41,7 +41,7 @@ function read (s, prop) {
 // Fills the cache with some feeds.
 function fill (prop = 'title') {
   read(fs.createReadStream('./test/data/feeds')
-    .pipe(lino())
+    .pipe(split())
     .pipe(cache.feeds()), prop)
 }
 

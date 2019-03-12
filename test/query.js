@@ -1,11 +1,11 @@
 'use strict'
 
 const fs = require('fs')
-const query = require('../lib/query')
-const lino = require('lino')
-const test = require('tap').test
 const path = require('path')
+const query = require('../lib/query')
+const split = require('binary-split')
 const stread = require('stread')
+const test = require('tap').test
 
 test('trim', (t) => {
   const f = query.trim
@@ -176,7 +176,7 @@ test('shield queries', (t) => {
 test('all queries', (t) => {
   const p = path.join(__dirname, 'data', 'all.json')
   const file = fs.createReadStream(p)
-  const uris = file.pipe(lino())
+  const uris = file.pipe(split())
   const queries = new query.Queries()
   const wanted = [
     query('http://just/b2w.xml'),

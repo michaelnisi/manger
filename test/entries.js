@@ -13,9 +13,7 @@ const stread = require('stread')
 const stream = require('readable-stream')
 const url = require('url')
 const zlib = require('zlib')
-
-const t = require('tap')
-const test = t.test
+const { test } = require('tap')
 
 test('all', (t) => {
   t.plan(13)

@@ -3,8 +3,8 @@
 const common = require('./lib/common')
 const fs = require('fs')
 const http = require('http')
-const lino = require('lino')
 const path = require('path')
+const split = require('binary-split')
 const stream = require('readable-stream')
 const test = require('tap').test
 const url = require('url')
@@ -48,7 +48,7 @@ test('not modified', (t) => {
       })
     })
 
-    input.pipe(lino()).pipe(setup).pipe(feeds).resume()
+    input.pipe(split()).pipe(setup).pipe(feeds).resume()
   }
 
   const fixtures = {
