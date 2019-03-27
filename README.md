@@ -3,7 +3,7 @@
 
 # manger - cache feeds
 
-The **manger** [Node.js](http://nodejs.org/) package provides caching for RSS and Atom formatted XML feeds, it implements an interface to query entries by feed and time.
+The **manger** [Node.js](http://nodejs.org/) package provides caching for RSS and Atom formatted XML feeds, it implements an interface to query entries by feed and time. The obvious challenge here is to build a resilient system facing potentially misconfigured servers and malformed feeds. Sometimes, archiving these random inputs like a web crawler, waste recycling comes to mind.
 
 ## Types
 
