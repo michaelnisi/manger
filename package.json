@@ -42,7 +42,7 @@
     "binary-split": "^1.0.5",
     "rimraf": "^2.6.1",
     "standard": "^12.0.1",
-    "stread": "^1.0.0",
+    "stread": "^3.0.1",
     "tap": "^12.5.3"
   },
   "author": "Michael Nisi (https://troubled.pro/)",
