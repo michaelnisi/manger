@@ -4,7 +4,7 @@
   "description": "cache feeds",
   "main": "index.js",
   "scripts": {
-    "pretest": "standard",
+    "pretest": "standard --fix",
     "test": "tap test/*.js -j1 --cov",
     "posttest": "rm -rf /tmp/manger-[1-9]* "
   },
