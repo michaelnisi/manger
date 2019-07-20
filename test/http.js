@@ -1,13 +1,27 @@
 'use strict'
 
 const common = require('./lib/common')
-const fs = require('fs')
 const http = require('http')
 const manger = require('../')
 const path = require('path')
-const { StringDecoder } = require('string_decoder')
-const { test } = require('tap')
 const url = require('url')
+const { StringDecoder } = require('string_decoder')
+const { createGzip } = require('zlib')
+const { createReadStream } = require('fs')
+const { test } = require('tap')
+
+function createFileStream (name, gzip = false) {
+  const p = path.join(__dirname, 'data', name)
+  const f = createReadStream(p)
+
+  if (gzip) {
+    const z = createGzip()
+
+    return f.pipe(z)
+  }
+
+  return f
+}
 
 test('ENOTFOUND', t => {
   t.plan(3)
@@ -43,7 +57,8 @@ test('ETag', (t) => {
 
   const headers = {
     'content-type': 'text/xml; charset=UTF-8',
-    'ETag': '55346232-18151'
+    'ETag': '55346232-18151',
+    'content-encoding': 'gzip'
   }
   const diffs = [
     { method: 'GET', code: 200 },
@@ -69,10 +84,9 @@ test('ETag', (t) => {
           'connection': 'close'
         }
         const found = req.headers
-        t.same(found, wanted, 'should send required headers')
 
-        const p = path.join(__dirname, 'data', 'b2w.xml')
-        fs.createReadStream(p).pipe(res)
+        t.same(found, wanted, 'should send required headers')
+        createFileStream('b2w.xml', true).pipe(res)
       } else if (diff.method === 'HEAD') {
         const wanted = {
           'accept': '*/*',
@@ -150,30 +164,26 @@ test('ETag', (t) => {
 
 test('301 while cached', t => {
   const headers = { 'content-type': 'text/xml; charset=UTF-8' }
-  const createReadStream = (name) => {
-    const p = path.join(__dirname, 'data', name)
-    return fs.createReadStream(p)
-  }
 
   const fixtures = [
     (req, res) => {
       t.is(req.url, '/b2w')
 
       res.writeHead(200, headers)
-      createReadStream('b2w.xml').pipe(res)
+      createFileStream('b2w.xml').pipe(res)
     },
     (req, res) => {
       t.is(req.url, '/b2w')
 
       res.setHeader('Location', 'http://localhost:1337/ddc')
       res.writeHead(301, headers)
-      createReadStream('b2w.xml').pipe(res)
+      createFileStream('b2w.xml').pipe(res)
     },
     (req, res) => {
       t.is(req.url, '/ddc')
 
       res.writeHead(200, headers)
-      createReadStream('ddc.xml').pipe(res)
+      createFileStream('ddc.xml').pipe(res)
     }
   ]
 
@@ -246,8 +256,7 @@ test('HEAD 404', t => {
       t.is(req.method, 'GET')
       t.is(req.url, '/b2w.xml')
       res.writeHead(200, headers)
-      const p = path.join(__dirname, 'data', 'b2w.xml')
-      fs.createReadStream(p).pipe(res)
+      createFileStream('b2w.xml').pipe(res)
     },
     (req, res) => {
       t.is(req.method, 'HEAD')
@@ -365,9 +374,7 @@ test('HEAD ECONNREFUSED', t => {
     }
 
     res.writeHead(200, headers)
-
-    const p = path.join(__dirname, 'data', 'b2w.xml')
-    fs.createReadStream(p).pipe(res)
+    createFileStream('b2w.xml').pipe(res)
   }).listen(1337, (er) => {
     if (er) throw er
     t.pass('should listen on 1337')
@@ -408,9 +415,7 @@ test('HEAD socket hangup', t => {
       t.is(req.url, '/b2w.xml')
 
       res.writeHead(200, headers)
-
-      const p = path.join(__dirname, 'data', 'b2w.xml')
-      fs.createReadStream(p).pipe(res)
+      createFileStream('b2w.xml').pipe(res)
     },
     (req, res) => {
       t.is(req.method, 'HEAD')
