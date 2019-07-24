@@ -23,7 +23,7 @@
     "cache"
   ],
   "engines": {
-    "node": ">=7"
+    "node": ">=7 <10"
   },
   "license": "MIT",
   "homepage": "https://github.com/michaelnisi/manger",
