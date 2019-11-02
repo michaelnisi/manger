@@ -138,11 +138,9 @@ A [Readable](http://nodejs.org/api/stream.html#stream_class_stream_readable_1) s
 
 - `read()` `Buffer() | str()`
 
-### cache.update(concurrencyLevel = 1)
+### cache.update()
 
-- `concurrencyLevel` `Number()` Tune the number of concurrent streams.
-
-Updates all ranked feeds and returns a stream that emits feed URLs of updated feeds. This, of course, could produce a resource heavy operation! Feeds are updated ordered by their popularity, using the rank index, therefor `flushCounter` must have been invoked before this method takes any effect. With `concurrencyLevel` you can choose how many transform streams will be used to concurrently do the work.
+Updates all ranked feeds and returns a stream that emits feed URLs of updated feeds. This, of course, is a **resource heavy long-running** operation! Feeds are updated ordered by their popularity, using the rank index, therefor `flushCounter` must have been invoked before this method takes any effect.
 
 - `read()` `str()`
 
