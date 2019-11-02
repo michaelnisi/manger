@@ -5,7 +5,7 @@
 exports = module.exports = Manger
 
 const bytewise = require('bytewise')
-const levelup = require('levelup')
+const level = require('level')
 const lru = require('lru-cache')
 const query = require('./lib/query')
 const { Entries, Feeds, URLs, FeedURLs, ranks, update, list } = require('./lib/streams')
@@ -39,7 +39,7 @@ function Manger (name, opts) {
   this.opts.redirects = lru({ max: 500, maxAge: 36e5 * 24 })
   this.counter = lru({ max: this.opts.counterMax })
 
-  const db = levelup(name, {
+  const db = level(name, {
     keyEncoding: bytewise,
     cacheSize: this.opts.cacheSize
   })

@@ -1,32 +1,34 @@
-// common - common test gear
+'use strict'
 
-exports.freshDB = freshDB
-exports.freshManger = freshManger
+exports.createManger = createManger
 exports.teardown = teardown
 
-const levelup = require('levelup')
-const manger = require('../../')
 const rimraf = require('rimraf')
+const { Manger, createLevelDB } = require('../../')
+const { defaults } = require('../../lib/init')
 
-function freshName () {
-  return '/tmp/manger-' + Math.floor(Math.random() * (1 << 24))
-}
+/**
+ * Returns a new Manger object initialized with `custom` options.
+ */
+function createManger (custom) {
+  const name = '/tmp/manger-' + Math.floor(Math.random() * (1 << 24))
+  const opts = defaults(custom)
+  const db = createLevelDB(name)
 
-function freshDB () {
-  const name = freshName()
-  return levelup(name)
-}
-
-function freshManger (opts) {
-  const name = freshName()
-  return manger(name, opts)
+  return new Manger(db, opts)
 }
 
 function teardown (cache, cb) {
-  const db = cache.db
-  const p = db.location
-  rimraf(p, (er) => {
-    if (cb) return cb(er)
+  const { db } = cache
+
+  db.close((er) => {
     if (er) throw er
+
+    const { _db: { db: { location } } } = db
+
+    rimraf(location, (er) => {
+      if (er) throw er
+      cb()
+    })
   })
 }

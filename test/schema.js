@@ -1,6 +1,6 @@
 'use strict'
 
-const bytewise = require('bytewise')
+const bytewise = require('charwise')
 const schema = require('../lib/schema')
 const test = require('tap').test
 
