@@ -1,49 +1,61 @@
 'use strict'
 
-const bytewise = require('charwise')
 const schema = require('../lib/schema')
 const test = require('tap').test
+const { decode } = require('charwise')
 
 function is (found, wanted, t) {
-  wanted.forEach(function (it) {
-    const that = bytewise.decode(found.shift())
+  wanted.forEach(it => {
+    const that = decode(found.shift())
+
     t.same(that, it)
   })
+
   t.is(found.length, 0)
+
   return t
 }
 
-test('rank', function (t) {
+test('rank', t => {
   const f = schema.rank
-  t.throws(function () { f('http://abc.de/') })
-  t.throws(function () { f('http://abc.de/', 'joker') })
+
+  t.throws(() => { f('http://abc.de/') })
+  t.throws(() => { f('http://abc.de/', 'joker') })
+
   const wanted = [
     ['manger', ['rank', 1, 'http://abc.de/']],
     ['manger', ['rank', 3, 'http://abc.de/']]
   ]
+
   const found = [
     f('http://abc.de', 1),
     f('http://abc.de/', 3)
   ]
+
   is(found, wanted, t).end()
 })
 
-test('entry', function (t) {
+test('entry', t => {
   const f = schema.entry
-  t.throws(function () { f('http://abc.de/', new Date()) })
+
+  t.throws(() => { f('http://abc.de/', new Date()) })
+
   const ts = Date.now()
+
   const wanted = [
     ['manger', ['entry', 'http://abc.de/', 0, null]],
     ['manger', ['entry', 'http://abc.de/', ts, null]]
   ]
+
   const found = [
     f('http://abc.de'),
     f('http://abc.de/', ts)
   ]
+
   is(found, wanted, t).end()
 })
 
-test('entries', function (t) {
+test('entries', t => {
   const f = schema.entries
   const wanted = [
     { gt: ['manger', ['entry', 'http://abc.de/', 0, null]],
@@ -59,18 +71,20 @@ test('entries', function (t) {
     f('http://abc.de'),
     f('http://abc.de', 3600, true)
   ]
+
   t.plan(wanted.length)
-  found.forEach(function (it) {
+  found.forEach(it => {
     const d = {
-      gt: bytewise.decode(it.gt),
-      lte: bytewise.decode(it.lte),
+      gt: decode(it.gt),
+      lte: decode(it.lte),
       fillCache: it.fillCache
     }
+
     t.same(d, wanted.shift())
   })
 })
 
-test('etag', function (t) {
+test('etag', t => {
   const f = schema.etag
   const wanted = [
     ['manger', ['etag', 'http://abc.de/']],
@@ -80,10 +94,11 @@ test('etag', function (t) {
     f('http://abc.de'),
     f('http://abc.de/')
   ]
+
   is(found, wanted, t).end()
 })
 
-test('feed', function (t) {
+test('feed', t => {
   const f = schema.feed
   const wanted = [
     ['manger', ['feed', 'http://abc.de/']],
@@ -93,5 +108,6 @@ test('feed', function (t) {
     f('http://abc.de'),
     f('http://abc.de/')
   ]
+
   is(found, wanted, t).end()
 })
