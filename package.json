@@ -1,6 +1,6 @@
 {
   "name": "manger",
-  "version": "7.0.0",
+  "version": "8.0.0",
   "description": "cache feeds",
   "main": "index.js",
   "scripts": {
@@ -22,9 +22,6 @@
     "feed",
     "cache"
   ],
-  "engines": {
-    "node": ">=12"
-  },
   "license": "MIT",
   "homepage": "https://github.com/michaelnisi/manger",
   "dependencies": {
@@ -42,6 +39,9 @@
     "standard": "^12.0.1",
     "stread": "^3.0.1",
     "tap": "^14.2.2"
+  },
+  "engines": {
+    "node": ">=10"
   },
   "author": "Michael Nisi (https://troubled.pro/)",
   "directories": {
