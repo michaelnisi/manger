@@ -1,8 +1,20 @@
 'use strict'
 
-const schema = require('../lib/schema')
 const test = require('tap').test
 const { decode } = require('charwise')
+
+const {
+  URIFromFeed,
+  URIFromRank,
+  countFromRank,
+  entries,
+  entry,
+  etag,
+  feed,
+  rank,
+  ranked,
+  ranks
+} = require('../lib/schema')
 
 function is (found, wanted, t) {
   wanted.forEach(it => {
@@ -17,10 +29,8 @@ function is (found, wanted, t) {
 }
 
 test('rank', t => {
-  const f = schema.rank
-
-  t.throws(() => { f('http://abc.de/') })
-  t.throws(() => { f('http://abc.de/', 'joker') })
+  t.throws(() => { rank('http://abc.de/') })
+  t.throws(() => { rank('http://abc.de/', 'joker') })
 
   const wanted = [
     ['manger', ['rank', 1, 'http://abc.de/']],
@@ -28,17 +38,55 @@ test('rank', t => {
   ]
 
   const found = [
-    f('http://abc.de', 1),
-    f('http://abc.de/', 3)
+    rank('http://abc.de', 1),
+    rank('http://abc.de/', 3)
   ]
 
   is(found, wanted, t).end()
 })
 
-test('entry', t => {
-  const f = schema.entry
+test('count from rank', t => {
+  const uri = 'http://abc.de/'
 
-  t.throws(() => { f('http://abc.de/', new Date()) })
+  t.is(countFromRank(rank(uri, 1)), 1)
+  t.is(countFromRank(rank(uri, 3)), 3)
+  t.end()
+})
+
+test('URI from rank', t => {
+  const uri = 'http://abc.de/'
+
+  t.is(URIFromRank(rank(uri, 1)), uri)
+  t.is(URIFromRank(rank(uri, 3)), uri)
+  t.end()
+})
+
+test('ranks', t => {
+  t.same(ranks(50), {
+    gte: 'KJmanger"KJrank"FE  0M0"A!!',
+    lte: 'KJmanger"KJrank"FF"L!!',
+    reverse: true,
+    limit: 50
+  })
+  t.end()
+})
+
+test('ranked', t => {
+  const uri = 'http://abc.de/'
+
+  t.is(ranked(uri), 'KJmanger"KJranked"Jhttp://abc.de/!!')
+  t.end()
+})
+
+test('URI from feed', t => {
+  const uri = 'http://abc.de/'
+
+  t.is(URIFromFeed(feed(uri)), uri)
+  t.end()
+})
+
+test('entry', t => {
+  t.throws(() => { entry('http://abc.de/', new Date()) })
 
   const ts = Date.now()
 
@@ -48,15 +96,14 @@ test('entry', t => {
   ]
 
   const found = [
-    f('http://abc.de'),
-    f('http://abc.de/', ts)
+    entry('http://abc.de'),
+    entry('http://abc.de/', ts)
   ]
 
   is(found, wanted, t).end()
 })
 
 test('entries', t => {
-  const f = schema.entries
   const wanted = [
     { gt: ['manger', ['entry', 'http://abc.de/', 0, null]],
       lte: ['manger', ['entry', 'http://abc.de/', Infinity, null]],
@@ -67,9 +114,10 @@ test('entries', t => {
       fillCache: true
     }
   ]
+
   const found = [
-    f('http://abc.de'),
-    f('http://abc.de', 3600, true)
+    entries('http://abc.de'),
+    entries('http://abc.de', 3600, true)
   ]
 
   t.plan(wanted.length)
@@ -85,28 +133,26 @@ test('entries', t => {
 })
 
 test('etag', t => {
-  const f = schema.etag
   const wanted = [
     ['manger', ['etag', 'http://abc.de/']],
     ['manger', ['etag', 'http://abc.de/']]
   ]
   const found = [
-    f('http://abc.de'),
-    f('http://abc.de/')
+    etag('http://abc.de'),
+    etag('http://abc.de/')
   ]
 
   is(found, wanted, t).end()
 })
 
 test('feed', t => {
-  const f = schema.feed
   const wanted = [
     ['manger', ['feed', 'http://abc.de/']],
     ['manger', ['feed', 'http://abc.de/']]
   ]
   const found = [
-    f('http://abc.de'),
-    f('http://abc.de/')
+    feed('http://abc.de'),
+    feed('http://abc.de/')
   ]
 
   is(found, wanted, t).end()
