@@ -6,8 +6,9 @@ const query = require('../lib/query')
 const split = require('binary-split')
 const stread = require('stread')
 const test = require('tap').test
+const { pipeline, Writable } = require('readable-stream')
 
-test('trim', (t) => {
+test('trim', t => {
   const f = query.trim
   t.is(typeof f, 'function')
   const strs = [
@@ -32,7 +33,7 @@ test('trim', (t) => {
   t.plan(wanted.length + 1)
 })
 
-test('query', (t) => {
+test('query', t => {
   const f = query
   const found = [
     f('http://5by5.tv/a'),
@@ -60,7 +61,7 @@ test('query', (t) => {
   })
 })
 
-test('request', (t) => {
+test('request', t => {
   const f = query
   const found = [
     f('http://abc.def/ghi.jkl').request(),
@@ -120,7 +121,7 @@ test('redirect', t => {
   t.end()
 })
 
-test('shield queries', (t) => {
+test('shield queries', t => {
   function go (i, o) {
     const input = i.shift()
     const wanted = o.shift()
@@ -173,29 +174,39 @@ test('shield queries', (t) => {
   wanted)
 })
 
-test('all queries', (t) => {
+test('all queries', t => {
   const p = path.join(__dirname, 'data', 'all.json')
-  const file = fs.createReadStream(p)
-  const uris = file.pipe(split())
-  const queries = new query.Queries()
-  const wanted = [
-    query('http://just/b2w.xml'),
-    query('http://some/ddc.xml'),
-    query('http://feeds/rl.xml'),
-    query('http://for/rz.xml'),
-    query('http://testing/tal.xml')
-  ]
-  t.plan(wanted.length)
-  queries.on('readable', () => {
-    t.same(queries.read(), wanted.shift())
-  })
-  var ok = true
-  function read () {
-    var chunk
-    while ((chunk = uris.read())) {
-      ok = queries.write(chunk)
+  let found = []
+
+  pipeline(
+    fs.createReadStream(p),
+    split(),
+    new query.Queries(),
+    new Writable({
+      objectMode: true,
+      write (chunk, enc, cb) {
+        found.push(chunk)
+        cb()
+      }
+    }),
+    error => {
+      if (error) throw error
+
+      let wanted = [
+        query('http://just/b2w.xml'),
+        query('http://some/ddc.xml'),
+        query('http://feeds/rl.xml'),
+        query('http://for/rz.xml'),
+        query('http://testing/tal.xml')
+      ]
+
+      t.is(found.length, wanted.length)
+
+      for (let q of found) {
+        t.same(q, wanted.shift())
+      }
+
+      t.end()
     }
-    if (!ok) queries.once('drain', read)
-  }
-  uris.on('readable', read)
+  )
 })
