@@ -121,6 +121,12 @@ test('redirect', t => {
   t.end()
 })
 
+test('uri', t => {
+  t.is(query('http://abc.de').redirect(302, 'http://fgh.ij').uri, 'http://abc.de/')
+  t.is(query('http://abc.de').redirect(301, 'http://fgh.ij').uri, 'http://fgh.ij/')
+  t.end()
+})
+
 test('shield queries', t => {
   function go (i, o) {
     const input = i.shift()
