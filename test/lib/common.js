@@ -1,7 +1,9 @@
 'use strict'
 
-exports.createManger = createManger
-exports.teardown = teardown
+module.exports = {
+  createManger,
+  teardown
+}
 
 const rimraf = require('rimraf')
 const { Manger, createLevelDB } = require('../../')

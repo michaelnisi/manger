@@ -1,6 +1,15 @@
 [![Build Status](https://secure.travis-ci.org/michaelnisi/manger.svg)](http://travis-ci.org/michaelnisi/manger)
 [![Coverage Status](https://coveralls.io/repos/github/michaelnisi/manger/badge.svg?branch=master)](https://coveralls.io/github/michaelnisi/manger?branch=master)
 
+
+# TODO:
+
+Pass tests
+
+x query
+x schema
+x strings
+
 # manger - cache feeds
 
 The **manger** [Node.js](http://nodejs.org/) package provides caching for RSS and Atom formatted XML feeds, it implements an interface to query entries by feed and time. The obvious challenge here is to build a resilient system facing potentially misconfigured servers and malformed feeds. Sometimes, archiving these random inputs like a web crawler, waste recycling comes to mind.

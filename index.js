@@ -4,15 +4,20 @@
 
 exports = module.exports = Manger
 
-const bytewise = require('bytewise')
-const level = require('level')
 const lru = require('lru-cache')
 const query = require('./lib/query')
 const { Entries, Feeds, URLs, FeedURLs, ranks, update, list } = require('./lib/streams')
 const { EventEmitter } = require('events')
-const { defaults, Opts } = require('./lib/conf')
-const { flushCounter, has, remove, resetRanks } = require('./lib/db')
+const { defaults, Opts } = require('./lib/init')
 const { inherits, debuglog } = require('util')
+
+const {
+  flushCounter,
+  has,
+  remove,
+  resetRanks,
+  createLevelDB
+} = require('./lib/db')
 
 const debug = debuglog('manger')
 
@@ -24,25 +29,21 @@ exports.Queries = query.Queries
 exports.URLs = URLs
 exports.query = query
 exports.Manger = Manger
+exports.createLevelDB = createLevelDB
 
 // Creates a new Manger cache, the API of this package.
 //
 // Failures and temporary redirects live 24 hours.
-function Manger (name, opts) {
-  if (!(this instanceof Manger)) return new Manger(name, opts)
+function Manger (db, opts) {
+  if (!(this instanceof Manger)) return new Manger(db, opts)
   EventEmitter.call(this)
 
-  debug('initializing: %s', name)
+  debug('initializing')
 
   this.opts = defaults(opts)
   this.opts.failures = lru({ max: 500, maxAge: 36e5 * 24 })
   this.opts.redirects = lru({ max: 500, maxAge: 36e5 * 24 })
   this.counter = lru({ max: this.opts.counterMax })
-
-  const db = level(name, {
-    keyEncoding: bytewise,
-    cacheSize: this.opts.cacheSize
-  })
 
   Object.defineProperty(this, 'db', { get: () => {
     if (!db || db.isClosed()) {

@@ -1,10 +1,15 @@
 'use strict'
 
-const strings = require('../lib/strings')
+const { html, entryID, duration, entryLink } = require('../lib/strings')
 const test = require('tap').test
 
+test('html', t => {
+  t.is(html({}), undefined)
+  t.is(html('<html><h1>Hello</h1></html>'), '<h1>Hello</h1>')
+  t.end()
+})
+
 test('entry identity', (t) => {
-  const f = strings.entryID
   const wanted = [
     null,
     null,
@@ -16,15 +21,16 @@ test('entry identity', (t) => {
     '8005a4160503520f79992a76a8374cd6e28af05f'
   ]
   const found = [
-    f(null),
-    f(undefined),
-    f({}),
-    f({ url: 'https://example.com' }),
-    f({ id: 'abc' }),
-    f({ url: 'https://example.com', id: 'abc' }),
-    f({ url: 'https://example.com', link: 'abc' }),
-    f({ url: 'https://example.com', title: 'abc' })
+    entryID(null),
+    entryID(undefined),
+    entryID({}),
+    entryID({ url: 'https://example.com' }),
+    entryID({ id: 'abc' }),
+    entryID({ url: 'https://example.com', id: 'abc' }),
+    entryID({ url: 'https://example.com', link: 'abc' }),
+    entryID({ url: 'https://example.com', title: 'abc' })
   ]
+
   t.plan(wanted.length)
   wanted.forEach((it) => {
     t.same(found.shift(), it)
@@ -32,7 +38,6 @@ test('entry identity', (t) => {
 })
 
 test('duration', (t) => {
-  const f = strings.duration
   const wanted = [
     null,
     null,
@@ -46,17 +51,18 @@ test('duration', (t) => {
     null
   ]
   const found = [
-    f(null),
-    f(undefined),
-    f(''),
-    f('hello'),
-    f('60'),
-    f('60:00'),
-    f('01:30:00'),
-    f('01:30:00:55'),
-    f('1:30:0'),
-    f('00:00:00')
+    duration(null),
+    duration(undefined),
+    duration(''),
+    duration('hello'),
+    duration('60'),
+    duration('60:00'),
+    duration('01:30:00'),
+    duration('01:30:00:55'),
+    duration('1:30:0'),
+    duration('00:00:00')
   ]
+
   t.plan(wanted.length)
   wanted.forEach((it) => {
     t.same(found.shift(), it)
@@ -64,8 +70,6 @@ test('duration', (t) => {
 })
 
 test('entry link', (t) => {
-  const f = strings.entryLink
-
   const a = 'http://abc.de/fgh'
   const b = 'http://abc.de/fgh.html'
   const c = 'http://abc.de/fgh.htm'
@@ -83,16 +87,16 @@ test('entry link', (t) => {
     null
   ]
   const found = [
-    f(),
-    f({}),
-    f({ link: a }),
-    f({ link: b }),
-    f({ link: c }),
-    f({ link: a, enclosure: { url: a } }),
-    f({ link: b, enclosure: { url: b } }),
-    f({ link: c, enclosure: { url: c } }),
-    f({ link: 'http://abc.de/fgh.mp3' }),
-    f({ link: 'abc.def' })
+    entryLink(),
+    entryLink({}),
+    entryLink({ link: a }),
+    entryLink({ link: b }),
+    entryLink({ link: c }),
+    entryLink({ link: a, enclosure: { url: a } }),
+    entryLink({ link: b, enclosure: { url: b } }),
+    entryLink({ link: c, enclosure: { url: c } }),
+    entryLink({ link: 'http://abc.de/fgh.mp3' }),
+    entryLink({ link: 'abc.def' })
   ]
 
   t.plan(wanted.length)

@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "pretest": "standard --fix",
-    "test": "tap test/query.js -j1 -b",
+    "test": "tap test/misc.js -j1 -b",
     "posttest": "rm -rf /tmp/manger-[1-9]* "
   },
   "repository": {

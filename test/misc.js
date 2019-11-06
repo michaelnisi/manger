@@ -5,10 +5,10 @@ var manger = require('../')
 var stringDecoder = require('string_decoder')
 
 const { test } = require('tap')
-const { freshManger } = require('./lib/common')
+const { createManger } = require('./lib/common')
 
 test('closed database', (t) => {
-  const cache = freshManger()
+  const cache = createManger()
 
   t.plan(1)
   cache.db.close(er => {
