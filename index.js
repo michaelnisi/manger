@@ -3,7 +3,8 @@
 // manger - cache feeds
 
 const query = require('./lib/query')
-const { Entries, Feeds, URLs, FeedURLs } = require('./lib/streams')
+const { Entries } = require('./lib/entries')
+const { Feeds, URLs, FeedURLs } = require('./lib/feeds')
 const { Manger } = require('./lib/manger')
 const { Opts } = require('./lib/init')
 const { createLevelDB } = require('./lib/db')
