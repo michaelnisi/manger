@@ -3,8 +3,7 @@
 const StringDecoder = require('string_decoder').StringDecoder
 const common = require('./lib/common')
 const http = require('http')
-const t = require('tap')
-const test = t.test
+const { test } = require('tap')
 
 const cache = common.createManger()
 const decoder = new StringDecoder()
@@ -74,10 +73,11 @@ test('list', (t) => {
 })
 
 test('update, without flushing first, ends', (t) => {
-  const s = cache.update()
-
-  s.on('data', (chunk) => { t.fail() })
-  s.on('end', () => { t.end() })
+  cache.update((error, uris) => {
+    if (error) throw error
+    t.is(uris.length, 0)
+    t.end()
+  })
 })
 
 test('flush counter', (t) => {
@@ -109,20 +109,16 @@ test('update', (t) => {
     t.pass()
   })
 
-  const s = cache.update()
+  cache.update((error, uris) => {
+    if (error) throw error
+    t.is(uris.length, 1)
 
-  let found = []
-  s.on('data', (chunk) => {
-    found.push(chunk)
-  })
+    const feed = uris[0]
 
-  s.on('end', () => {
-    t.is(found.length, 1)
-
-    const feed = found[0]
     t.is(feed.url, 'http://localhost:1338/')
-
-    b.close(() => { t.pass() })
+    b.close(() => {
+      t.pass()
+    })
   })
 })
 

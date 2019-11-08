@@ -99,10 +99,11 @@ test('list', (t) => {
 })
 
 test('update, without flushing first, ends', (t) => {
-  const s = cache.update()
-
-  s.on('data', (chunk) => { t.fail() })
-  s.on('end', () => { t.end() })
+  cache.update((error, uris) => {
+    if (error) throw error
+    t.is(uris.length, 0)
+    t.end()
+  })
 })
 
 test('flush counter', (t) => {
@@ -135,17 +136,13 @@ test('update', (t) => {
     t.pass()
   })
 
-  const s = cache.update()
+  cache.update((error, uris) => {
+    if (error) throw error
 
-  let found = []
-  s.on('data', (chunk) => {
-    found.push(chunk)
-  })
+    t.is(uris.length, 1)
 
-  s.on('end', () => {
-    t.is(found.length, 1)
+    const feed = uris[0]
 
-    const feed = found[0]
     t.is(feed.url, a.href)
     t.is(feed.originalURL, a.href)
 
