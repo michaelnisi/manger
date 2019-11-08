@@ -13,7 +13,7 @@ test('not modified', (t) => {
   t.plan(7)
 
   const go = () => {
-    const store = common.freshManger()
+    const store = common.createManger()
     const feeds = store.feeds()
     const p = path.join(__dirname, 'data', 'ALL')
     const input = fs.createReadStream(p)

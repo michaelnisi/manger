@@ -15,7 +15,7 @@ function QueryCount (uri, count) {
 }
 
 test('allFeeds', { skip: false }, (t) => {
-  const cache = common.freshManger()
+  const cache = common.createManger()
   const db = cache.db
 
   const uris = ['abc', 'def', 'ghi']
@@ -69,7 +69,7 @@ test('rank', (t) => {
     ops.push(op)
   })
 
-  const store = common.freshManger()
+  const store = common.createManger()
   const db = store.db
 
   t.plan(6)

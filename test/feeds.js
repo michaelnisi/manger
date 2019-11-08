@@ -20,7 +20,7 @@ test('plain feed caching', (t) => {
     if (er) throw er
     t.pass('should listen in 1337')
 
-    const cache = common.freshManger()
+    const cache = common.createManger()
     const feeds = cache.feeds()
     assert(feeds instanceof stream.Readable, 'should be Readable')
 

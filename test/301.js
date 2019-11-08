@@ -6,7 +6,7 @@ const http = require('http')
 const t = require('tap')
 const test = t.test
 
-const cache = common.freshManger()
+const cache = common.createManger()
 const decoder = new StringDecoder()
 
 test('first request', (t) => {

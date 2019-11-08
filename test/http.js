@@ -26,7 +26,7 @@ function createFileStream (name, gzip = false) {
 test('ENOTFOUND', t => {
   t.plan(3)
 
-  const store = common.freshManger()
+  const store = common.createManger()
   const feeds = store.feeds()
 
   let buf = ''
@@ -117,7 +117,7 @@ test('ETag', (t) => {
     go()
   })
 
-  const store = common.freshManger()
+  const store = common.createManger()
 
   const go = () => {
     const feeds = store.feeds()
@@ -195,7 +195,7 @@ test('301 while cached', t => {
     if (er) throw er
     t.pass('should listen on port 1337')
 
-    const cache = common.freshManger()
+    const cache = common.createManger()
     const x = Math.random() > 0.5
     const s = x ? cache.feeds() : cache.entries()
 
@@ -281,7 +281,7 @@ test('HEAD 404', t => {
   ]
 
   const go = () => {
-    const store = common.freshManger()
+    const store = common.createManger()
     const feeds = store.feeds()
     feeds.on('error', er => {
       t.is(er.message, 'quaint HTTP status: 404 from localhost:1337')
@@ -322,7 +322,7 @@ test('HEAD 404', t => {
 
 test('HEAD ECONNREFUSED', t => {
   const go = () => {
-    const store = common.freshManger()
+    const store = common.createManger()
     const feeds = store.feeds()
 
     feeds.on('error', er => {
@@ -384,7 +384,7 @@ test('HEAD ECONNREFUSED', t => {
 
 test('HEAD socket hangup', t => {
   const go = () => {
-    const store = common.freshManger()
+    const store = common.createManger()
     const feeds = store.feeds()
     feeds.on('error', (er) => {
       t.is(er.message, 'socket hang up', 'should err twice')

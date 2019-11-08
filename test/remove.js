@@ -6,7 +6,7 @@ const http = require('http')
 const path = require('path')
 const test = require('tap').test
 
-const cache = common.freshManger()
+const cache = common.createManger()
 
 test('setup', (t) => {
   t.plan(4)

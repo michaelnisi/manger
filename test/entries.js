@@ -7,10 +7,10 @@ const common = require('./lib/common')
 const debug = require('util').debuglog('manger')
 const fs = require('fs')
 const http = require('http')
-const manger = require('../')
+const { Queries, update } = require('../')
 const path = require('path')
 const stread = require('stread')
-const stream = require('readable-stream')
+const { pipeline, Writable, Readable, PassThrough } = require('readable-stream')
 const url = require('url')
 const zlib = require('zlib')
 const { test } = require('tap')
@@ -27,7 +27,7 @@ test('all', (t) => {
 
       const p = path.join(__dirname, 'data', 'b2w.xml')
       const file = fs.createReadStream(p)
-      const x = zip ? zlib.createGzip() : new stream.PassThrough()
+      const x = zip ? zlib.createGzip() : new PassThrough()
 
       file.pipe(x).pipe(res)
     })
@@ -54,9 +54,9 @@ test('all', (t) => {
         t.pass()
       })
     }
-    const cache = common.freshManger()
+    const cache = common.createManger()
     const entries = cache.entries()
-    assert(entries instanceof stream.Readable, 'should be Readable')
+    assert(entries instanceof Readable, 'should be Readable')
     let chunks = ''
     entries.on('error', (er) => { throw er })
     entries.on('data', (chunk) => { chunks += chunk })
@@ -108,7 +108,7 @@ test('time range', (t) => {
 
   t.is(servers.length, 2)
 
-  const store = common.freshManger()
+  const store = common.createManger()
 
   const go = (cb) => {
     const entries = store.entries()
@@ -129,7 +129,7 @@ test('time range', (t) => {
         since: new Date('Fri, 1 Nov 2013 11:29:00 -0700')
       }
     ])
-    const queries = manger.Queries()
+    const queries = new Queries()
     stread(rawQueries).pipe(queries)
     queries.pipe(entries)
   }
@@ -164,17 +164,28 @@ test('time range', (t) => {
 })
 
 const read = (entries, uri, cb) => {
-  const found = []
-  entries.on('finish', () => {
-    cb(found)
-  })
-  entries.on('readable', () => {
-    let entry = null
-    while ((entry = entries.read()) !== null) {
-      found.push(entry)
+  let uris = [uri]
+  let chunks = []
+
+  pipeline(
+    new Readable({
+      read () {
+        const chunk = uris.shift() || null
+        this.push(chunk)
+      }
+    }),
+    entries,
+    new Writable({
+      objectMode: true,
+      write (chunk, enc, cb) {
+        chunks.push(chunk)
+        cb()
+      }
+    }), error => {
+      if (error) throw error
+      cb(chunks)
     }
-  })
-  entries.end(uri)
+  )
 }
 
 test('default date', (t) => {
@@ -195,7 +206,7 @@ test('default date', (t) => {
     t.pass()
   })
 
-  const store = common.freshManger({ objectMode: true })
+  const store = common.createManger({ objectMode: true })
 
   function go (cb) {
     read(store.entries(), `${origin}/planets`, (entries) => {
@@ -219,7 +230,7 @@ test('default date', (t) => {
   go(go)
 })
 
-test('entry updating', (t) => {
+test('entry updating', t => {
   const origin = 'http://localhost:1337'
   const uri = url.parse(origin)
   const port = uri.port
@@ -233,8 +244,6 @@ test('entry updating', (t) => {
 
   const replies = [reply('Venus'), reply('Earth')]
 
-  t.plan(8)
-
   const server = http.createServer((req, res) => {
     t.is(req.url, '/planets')
     res.end(replies.shift())
@@ -243,7 +252,7 @@ test('entry updating', (t) => {
     t.pass()
   })
 
-  const store = common.freshManger({ objectMode: true })
+  const store = common.createManger({ objectMode: true })
   const id = `${origin}/planets`
 
   read(store.entries(), id, (entries) => {
@@ -255,26 +264,29 @@ test('entry updating', (t) => {
     t.same(entries.map(e => e.title), ['Mercury', 'Venus'])
     t.same(entries.map(e => e.id), wanted)
 
-    // TODO: Write test for passing invalid urls
     store.has(id, (er) => {
       if (er) throw er
+
       store.flushCounter((er) => {
         if (er) throw er
-        const update = store.update()
-        update.on('end', () => {
+
+        store.update((error, updated) => {
+          if (error) throw error
+
           read(store.entries(), id, (entries) => {
             t.same(entries.map(e => e.title), ['Mercury', 'Earth'])
             t.same(entries.map(e => e.id), wanted)
+
             common.teardown(store, (er) => {
               if (er) throw er
+
               server.close((er) => {
                 if (er) throw er
-                t.pass()
+                t.end()
               })
             })
           })
         })
-        update.resume()
       })
     })
   })

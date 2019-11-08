@@ -54,13 +54,13 @@ test('queries and requests', (t) => {
   }
 
   t.test('feeds', (t) => {
-    const cache = common.freshManger()
+    const cache = common.createManger()
     const feeds = cache.feeds()
     go(feeds, t, teardown(t, cache))
   })
 
   t.test('entries', (t) => {
-    const cache = common.freshManger()
+    const cache = common.createManger()
     const entries = cache.entries()
     go(entries, t, teardown(t, cache))
   })

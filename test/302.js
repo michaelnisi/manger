@@ -6,7 +6,7 @@ const http = require('http')
 const test = require('tap').test
 const url = require('url')
 
-const cache = common.freshManger()
+const cache = common.createManger()
 const decoder = new StringDecoder('utf8')
 
 const a = url.parse('http://localhost:1337/a')
