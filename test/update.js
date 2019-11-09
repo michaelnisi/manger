@@ -10,20 +10,14 @@ const test = require('tap').test
 const { format } = require('url')
 
 test('not modified', (t) => {
-  t.plan(7)
-
   const go = () => {
     const store = common.createManger()
     const feeds = store.feeds()
     const p = path.join(__dirname, 'data', 'ALL')
     const input = fs.createReadStream(p)
     const update = () => {
-      const updated = store.update()
-      updated.on('error', (er) => {
-        throw er
-      })
-      updated.on('end', () => {
-        t.pass('should end update')
+      store.update((error, updated) => {
+        if (error) throw error
 
         Object.keys(fixtures).forEach((key) => {
           t.is(fixtures[key].length, 0, 'should hit all fixtures')
@@ -35,11 +29,12 @@ test('not modified', (t) => {
           common.teardown(store, (er) => {
             if (er) throw er
             t.pass('should teardown')
+            t.end()
           })
         })
       })
-      updated.resume()
     }
+
     feeds.on('finish', () => {
       store.flushCounter((er) => {
         if (er) throw er

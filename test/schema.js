@@ -62,19 +62,17 @@ test('URI from rank', t => {
 })
 
 test('ranks', t => {
-  t.same(ranks(50), {
-    gte: 'KJmanger"KJrank"FE  0M0"A!!',
-    lte: 'KJmanger"KJrank"FF"L!!',
-    reverse: true,
-    limit: 50
-  })
+  const { gte, lte } = ranks(50)
+
+  t.is(gte.toString(), 'a0706d616e67657200a07072616e6b00420000000000000000100000')
+  t.is(lte.toString(), 'a0706d616e67657200a07072616e6b0043f00000')
   t.end()
 })
 
 test('ranked', t => {
   const uri = 'http://abc.de/'
 
-  t.is(ranked(uri), 'KJmanger"KJranked"Jhttp://abc.de/!!')
+  t.is(ranked(uri).toString(), 'a0706d616e67657200a07072616e6b65640070687474703a2f2f6162632e64652f000000')
   t.end()
 })
 

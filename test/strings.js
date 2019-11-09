@@ -96,7 +96,7 @@ test('entry link', (t) => {
     entryLink({ link: b, enclosure: { url: b } }),
     entryLink({ link: c, enclosure: { url: c } }),
     entryLink({ link: 'http://abc.de/fgh.mp3' }),
-    entryLink({ link: 'abc.def' })
+    entryLink({ link: 'abc.de' })
   ]
 
   t.plan(wanted.length)
