@@ -6,7 +6,8 @@ module.exports = {
 }
 
 const rimraf = require('rimraf')
-const { Manger, createLevelDB } = require('../../')
+const { Manger } = require('../../')
+const { createLevelDB } = require('../../lib/db')
 const { defaults } = require('../../lib/init')
 
 /**

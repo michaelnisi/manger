@@ -7,7 +7,7 @@ const path = require('path')
 const split = require('binary-split')
 const stream = require('readable-stream')
 const test = require('tap').test
-const url = require('url')
+const { format } = require('url')
 
 test('not modified', (t) => {
   t.plan(7)
@@ -52,8 +52,8 @@ test('not modified', (t) => {
   }
 
   const fixtures = {
-    'HEAD': [],
-    'GET': []
+    HEAD: [],
+    GET: []
   }
 
   const server = http.createServer((req, res) => {
@@ -67,20 +67,20 @@ test('not modified', (t) => {
   const setup = new stream.Transform()
   const headers = {
     'content-type': 'text/xml; charset=UTF-8',
-    'ETag': '55346232-18151'
+    ETag: '55346232-18151'
   }
   setup._transform = (chunk, enc, cb) => {
-    const uri = url.parse('' + chunk)
-    const route = '/' + path.basename(url.format(uri))
+    const uri = new URL('' + chunk)
+    const route = '/' + path.basename(format(uri))
     const filename = route + '.xml'
 
-    fixtures['GET'].push((req, res) => {
+    fixtures.GET.push((req, res) => {
       res.writeHead(200, headers)
       const p = path.join(__dirname, 'data', filename)
       fs.createReadStream(p).pipe(res)
     })
 
-    fixtures['HEAD'].push((req, res) => {
+    fixtures.HEAD.push((req, res) => {
       res.writeHead(304, headers)
       res.end()
     })

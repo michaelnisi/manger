@@ -11,7 +11,7 @@ const { Queries } = require('../')
 const path = require('path')
 const stread = require('stread')
 const { pipeline, Writable, Readable, PassThrough } = require('readable-stream')
-const url = require('url')
+const { URL } = require('url')
 const zlib = require('zlib')
 const { test } = require('tap')
 
@@ -85,7 +85,7 @@ test('time range', (t) => {
   const headers = { 'Content-Type': 'text/xml; charset=UTF-8' }
 
   const servers = origins.reduce((acc, origin) => {
-    const uri = url.parse(origin)
+    const uri = new URL(origin)
     const port = uri.port
 
     const server = http.createServer((req, res) => {
@@ -122,10 +122,12 @@ test('time range', (t) => {
     })
 
     const rawQueries = JSON.stringify([
-      { url: origins[0],
+      {
+        url: origins[0],
         since: new Date('Tue, 17 Dec 2013 22:00:00 GMT')
       },
-      { url: origins[1],
+      {
+        url: origins[1],
         since: new Date('Fri, 1 Nov 2013 11:29:00 -0700')
       }
     ])
@@ -164,8 +166,8 @@ test('time range', (t) => {
 })
 
 const read = (entries, uri, cb) => {
-  let uris = [uri]
-  let chunks = []
+  const uris = [uri]
+  const chunks = []
 
   pipeline(
     new Readable({
@@ -190,7 +192,7 @@ const read = (entries, uri, cb) => {
 
 test('default date', (t) => {
   const origin = 'http://localhost:1337'
-  const uri = url.parse(origin)
+  const uri = new URL(origin)
   const port = uri.port
 
   t.plan(7)
@@ -232,7 +234,7 @@ test('default date', (t) => {
 
 test('entry updating', t => {
   const origin = 'http://localhost:1337'
-  const uri = url.parse(origin)
+  const uri = new URL(origin)
   const port = uri.port
 
   function reply (title) {

@@ -4,20 +4,20 @@ const StringDecoder = require('string_decoder').StringDecoder
 const common = require('./lib/common')
 const http = require('http')
 const test = require('tap').test
-const url = require('url')
+const { URL } = require('url')
 
 const cache = common.createManger()
 const decoder = new StringDecoder('utf8')
 
-const a = url.parse('http://localhost:1337/a')
-const b = url.parse('http://localhost:1337/b')
+const a = new URL('http://localhost:1337/a')
+const b = new URL('http://localhost:1337/b')
 
 test('first request', (t) => {
   t.plan(8)
 
   const fixtures = [
     (req, res) => {
-      t.is(req.url, a.path)
+      t.is(req.url, a.pathname)
 
       res.setHeader('ETag', '55346232-18151')
       res.setHeader('Location', b.href)
@@ -26,7 +26,7 @@ test('first request', (t) => {
       res.end('ok')
     },
     (req, res) => {
-      t.is(req.url, b.path)
+      t.is(req.url, b.pathname)
 
       res.writeHead(200, { 'Content-Type': 'text/xml; charset=UTF-8' })
       res.end(`<rss>
@@ -38,7 +38,7 @@ test('first request', (t) => {
               </rss>`)
     },
     (req, res) => {
-      t.is(req.url, b.path)
+      t.is(req.url, b.pathname)
 
       res.writeHead(200, { 'Content-Type': 'text/xml; charset=UTF-8' })
       res.end(`<rss>
@@ -118,7 +118,7 @@ test('update', (t) => {
   t.plan(6)
 
   const server = http.createServer((req, res) => {
-    t.is(req.url, b.path)
+    t.is(req.url, b.pathname)
 
     res.writeHead(200, { 'Content-Type': 'text/xml; charset=UTF-8' })
     res.end(`<rss>

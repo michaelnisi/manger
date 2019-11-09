@@ -69,26 +69,29 @@ test('request', t => {
     f('https://abc.def/ghi.jkl').request()
   ]
   const headers = {
-    'accept': '*/*',
+    accept: '*/*',
     'accept-encoding': 'gzip',
     'user-agent': `nodejs/${process.version}`
   }
   const wanted = [
-    { hostname: 'abc.def',
+    {
+      hostname: 'abc.def',
       port: 80,
       path: '/ghi.jkl',
       method: 'GET',
       protocol: 'http:',
       headers: headers
     },
-    { hostname: 'abc.def',
+    {
+      hostname: 'abc.def',
       port: 80,
       path: '/ghi.jkl',
       method: 'GET',
       protocol: 'http:',
       headers: Object.assign({ 'if-none-match': '123' }, headers)
     },
-    { hostname: 'abc.def',
+    {
+      hostname: 'abc.def',
       port: 443,
       path: '/ghi.jkl',
       method: 'GET',
@@ -112,7 +115,7 @@ test('redirect', t => {
     null
   ]
   // --
-  for (let it of wanted) {
+  for (const it of wanted) {
     t.same(found.shift(), it)
   }
   t.throws(() => { query('http://abc.de').redirect() })
@@ -182,7 +185,7 @@ test('shield queries', t => {
 
 test('all queries', t => {
   const p = path.join(__dirname, 'data', 'all.json')
-  let found = []
+  const found = []
 
   pipeline(
     fs.createReadStream(p),
@@ -198,7 +201,7 @@ test('all queries', t => {
     error => {
       if (error) throw error
 
-      let wanted = [
+      const wanted = [
         query('http://just/b2w.xml'),
         query('http://some/ddc.xml'),
         query('http://feeds/rl.xml'),
@@ -208,7 +211,7 @@ test('all queries', t => {
 
       t.is(found.length, wanted.length)
 
-      for (let q of found) {
+      for (const q of found) {
         t.same(q, wanted.shift())
       }
 

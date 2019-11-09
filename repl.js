@@ -27,7 +27,7 @@ function read (s, prop) {
   }).on('readable', () => {
     let obj
     while ((obj = s.read()) !== null) {
-      let item = prop ? obj[prop] : obj
+      const item = prop ? obj[prop] : obj
 
       dir(item, { colors: true })
     }

@@ -15,7 +15,7 @@ test('plain feed caching', (t) => {
     res.setHeader('ETag', '55346232-18151')
     res.writeHead(200, { 'Content-Type': 'text/xml; charset=UTF-8' })
 
-    res.end(`<rss><channel></channel></rss>`)
+    res.end('<rss><channel></channel></rss>')
   }).listen(1337, 'localhost', (er) => {
     if (er) throw er
     t.pass('should listen in 1337')

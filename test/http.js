@@ -2,9 +2,9 @@
 
 const common = require('./lib/common')
 const http = require('http')
-const manger = require('../')
+const { Query } = require('../')
 const path = require('path')
-const url = require('url')
+const { URL } = require('url')
 const { StringDecoder } = require('string_decoder')
 const { createGzip } = require('zlib')
 const { createReadStream } = require('fs')
@@ -48,7 +48,7 @@ test('ENOTFOUND', t => {
   })
 
   const uri = 'http://nowhere'
-  const qry = manger.query(uri, null, null, true)
+  const qry = Query.create(uri, null, null, true)
   feeds.end(qry)
 })
 
@@ -57,7 +57,7 @@ test('ETag', (t) => {
 
   const headers = {
     'content-type': 'text/xml; charset=UTF-8',
-    'ETag': '55346232-18151',
+    ETag: '55346232-18151',
     'content-encoding': 'gzip'
   }
   const diffs = [
@@ -66,22 +66,22 @@ test('ETag', (t) => {
     { method: 'HEAD', code: 304 }
   ]
 
-  const uri = url.parse('http://localhost:1337/b2w')
+  const uri = new URL('http://localhost:1337/b2w')
 
   const fixtures = diffs.map((diff) => {
     return (req, res) => {
-      t.is(req.url, uri.path, 'should hit correct URL')
+      t.is(req.url, uri.pathname, 'should hit correct URL')
       t.is(req.method, diff.method, 'should use expected method')
 
       res.writeHead(diff.code, headers)
 
       if (diff.method === 'GET') {
         const wanted = {
-          'accept': '*/*',
+          accept: '*/*',
           'accept-encoding': 'gzip',
-          'host': 'localhost:1337',
+          host: 'localhost:1337',
           'user-agent': `nodejs/${process.version}`,
-          'connection': 'close'
+          connection: 'close'
         }
         const found = req.headers
 
@@ -89,12 +89,12 @@ test('ETag', (t) => {
         createFileStream('b2w.xml', true).pipe(res)
       } else if (diff.method === 'HEAD') {
         const wanted = {
-          'accept': '*/*',
+          accept: '*/*',
           'accept-encoding': 'gzip',
-          'host': 'localhost:1337',
+          host: 'localhost:1337',
           'if-none-match': '55346232-18151',
           'user-agent': `nodejs/${process.version}`,
-          'connection': 'close'
+          connection: 'close'
         }
         const found = req.headers
         t.same(found, wanted, 'should send required headers')
@@ -151,7 +151,7 @@ test('ETag', (t) => {
     })
 
     const href = uri.href
-    const qry = manger.query(href, null, null, true)
+    const qry = new Query(href, null, null, true)
 
     // From the cache perspective, producing miss, hit, miss, miss; resulting
     // in three requests.
@@ -227,7 +227,7 @@ test('301 while cached', t => {
     })
     const uri = 'http://localhost:1337/b2w'
     s.write(uri)
-    const q = manger.query(uri, null, null, true)
+    const q = new Query(uri, null, null, true)
     s.end(q)
   })
 })
@@ -248,7 +248,7 @@ function done (server, cache, t, cb) {
 test('HEAD 404', t => {
   const headers = {
     'content-type': 'text/xml; charset=UTF-8',
-    'ETag': '55346232-18151'
+    ETag: '55346232-18151'
   }
 
   const fixtures = [
@@ -302,7 +302,7 @@ test('HEAD 404', t => {
     t.ok(feeds.write(uri))
     t.ok(feeds.write(uri), 'should be cached')
 
-    const qry = manger.query(uri, null, null, true)
+    const qry = new Query(uri, null, null, true)
     t.ok(feeds.write(qry))
     t.ok(feeds.write(qry))
 
@@ -337,7 +337,7 @@ test('HEAD ECONNREFUSED', t => {
           if (er) throw er
           t.pass('should close server')
 
-          const qry = manger.query(uri, null, null, true)
+          const qry = new Query(uri, null, null, true)
           t.ok(feeds.write(qry))
 
           feeds.end()
@@ -370,7 +370,7 @@ test('HEAD ECONNREFUSED', t => {
 
     const headers = {
       'content-type': 'text/xml; charset=UTF-8',
-      'ETag': '55346232-18151'
+      ETag: '55346232-18151'
     }
 
     res.writeHead(200, headers)
@@ -397,7 +397,7 @@ test('HEAD socket hangup', t => {
     t.ok(feeds.write(uri), 'should GET')
     t.ok(feeds.write(uri), 'should hit cache')
 
-    const qry = manger.query(uri, null, null, true)
+    const qry = new Query(uri, null, null, true)
     t.ok(feeds.write(qry))
 
     feeds.end()
@@ -406,7 +406,7 @@ test('HEAD socket hangup', t => {
 
   const headers = {
     'content-type': 'text/xml; charset=UTF-8',
-    'ETag': '55346232-18151'
+    ETag: '55346232-18151'
   }
 
   const fixtures = [

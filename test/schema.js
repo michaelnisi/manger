@@ -105,11 +105,13 @@ test('entry', t => {
 
 test('entries', t => {
   const wanted = [
-    { gt: ['manger', ['entry', 'http://abc.de/', 0, null]],
+    {
+      gt: ['manger', ['entry', 'http://abc.de/', 0, null]],
       lte: ['manger', ['entry', 'http://abc.de/', Infinity, null]],
       fillCache: false
     },
-    { gt: ['manger', ['entry', 'http://abc.de/', 3600, null]],
+    {
+      gt: ['manger', ['entry', 'http://abc.de/', 3600, null]],
       lte: ['manger', ['entry', 'http://abc.de/', Infinity, null]],
       fillCache: true
     }

@@ -35,7 +35,7 @@ test('setup', (t) => {
 
     const headers = {
       'content-type': 'text/xml; charset=UTF-8',
-      'ETAG': '55346232-18151'
+      ETAG: '55346232-18151'
     }
 
     res.writeHead(200, headers)
