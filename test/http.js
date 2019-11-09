@@ -1,12 +1,11 @@
 'use strict'
 
-const common = require('./lib/common')
 const http = require('http')
-const { Query } = require('../')
 const path = require('path')
+const { Query } = require('../')
 const { URL } = require('url')
-const { StringDecoder } = require('string_decoder')
 const { createGzip } = require('zlib')
+const { createManger, teardown } = require('./lib/common')
 const { createReadStream } = require('fs')
 const { test } = require('tap')
 
@@ -24,31 +23,36 @@ function createFileStream (name, gzip = false) {
 }
 
 test('ENOTFOUND', t => {
-  t.plan(3)
-
-  const store = common.createManger()
+  const store = createManger()
   const feeds = store.feeds()
 
-  let buf = ''
-  const dec = new StringDecoder('utf8')
+  const acc = []
+
   feeds.on('end', () => {
-    const found = dec.write(buf)
+    const found = Buffer.concat(acc).toString()
+
     t.is(found, '[]')
-    common.teardown(store, (er) => {
+
+    teardown(store, er => {
       if (er) throw er
       t.pass('should teardown')
+      t.end()
     })
   })
+
   feeds.on('readable', () => {
     let chunk
-    while ((chunk = feeds.read())) { buf += chunk }
+    while ((chunk = feeds.read())) { acc.push(chunk) }
   })
-  feeds.on('error', (er) => {
-    t.has(er, { code: 'ENOTFOUND', host: 'nowhere', port: 80 })
+
+  feeds.on('error', er => {
+    t.ok(er)
+    t.has(er, { code: 'ENOTFOUND', hostname: 'nowhere', url: 'http://nowhere/' })
   })
 
   const uri = 'http://nowhere'
   const qry = Query.create(uri, null, null, true)
+
   feeds.end(qry)
 })
 
@@ -117,7 +121,7 @@ test('ETag', (t) => {
     go()
   })
 
-  const store = common.createManger()
+  const store = createManger()
 
   const go = () => {
     const feeds = store.feeds()
@@ -143,7 +147,7 @@ test('ETag', (t) => {
       server.close((er) => {
         if (er) throw er
         t.pass('should close server')
-        common.teardown(store, (er) => {
+        teardown(store, (er) => {
           if (er) throw er
           t.pass('should teardown')
         })
@@ -195,11 +199,12 @@ test('301 while cached', t => {
     if (er) throw er
     t.pass('should listen on port 1337')
 
-    const cache = common.createManger()
+    const cache = createManger()
     const x = Math.random() > 0.5
     const s = x ? cache.feeds() : cache.entries()
 
     let buf = ''
+
     s.on('data', (chunk) => {
       buf += chunk
     })
@@ -219,7 +224,7 @@ test('301 while cached', t => {
         if (er) throw er
         t.pass('should close server')
 
-        common.teardown(cache, (er) => {
+        teardown(cache, (er) => {
           if (er) throw er
           t.pass('should teardown')
         })
@@ -237,7 +242,7 @@ function done (server, cache, t, cb) {
     if (er) throw er
     t.pass('should close server')
     if (!cache) return cb ? cb() : null
-    common.teardown(cache, (er) => {
+    teardown(cache, (er) => {
       if (er) throw er
       t.pass('should teardown')
       if (cb) cb()
@@ -281,7 +286,7 @@ test('HEAD 404', t => {
   ]
 
   const go = () => {
-    const store = common.createManger()
+    const store = createManger()
     const feeds = store.feeds()
     feeds.on('error', er => {
       t.is(er.message, 'quaint HTTP status: 404 from localhost:1337')
@@ -315,6 +320,7 @@ test('HEAD 404', t => {
     fixtures.shift()(req, res)
   }).listen(1337, (er) => {
     if (er) throw er
+
     t.pass('should listen on 1337')
     go()
   })
@@ -322,7 +328,7 @@ test('HEAD 404', t => {
 
 test('HEAD ECONNREFUSED', t => {
   const go = () => {
-    const store = common.createManger()
+    const store = createManger()
     const feeds = store.feeds()
 
     feeds.on('error', er => {
@@ -338,8 +344,8 @@ test('HEAD ECONNREFUSED', t => {
           t.pass('should close server')
 
           const qry = new Query(uri, null, null, true)
-          t.ok(feeds.write(qry))
 
+          t.ok(feeds.write(qry))
           feeds.end()
         })
       }
@@ -352,13 +358,14 @@ test('HEAD ECONNREFUSED', t => {
 
     feeds.on('end', () => {
       JSON.parse(chunks)
-      common.teardown(store, (er) => {
+      teardown(store, (er) => {
         if (er) throw er
         t.pass('should teardown')
       })
     })
 
     const uri = 'http://localhost:1337/b2w.xml'
+
     t.ok(feeds.write(uri))
   }
 
@@ -384,8 +391,9 @@ test('HEAD ECONNREFUSED', t => {
 
 test('HEAD socket hangup', t => {
   const go = () => {
-    const store = common.createManger()
+    const store = createManger()
     const feeds = store.feeds()
+
     feeds.on('error', (er) => {
       t.is(er.message, 'socket hang up', 'should err twice')
     })
@@ -394,10 +402,12 @@ test('HEAD socket hangup', t => {
     })
 
     const uri = 'http://localhost:1337/b2w.xml'
+
     t.ok(feeds.write(uri), 'should GET')
     t.ok(feeds.write(uri), 'should hit cache')
 
     const qry = new Query(uri, null, null, true)
+
     t.ok(feeds.write(qry))
 
     feeds.end()

@@ -2,15 +2,13 @@
 
 const fs = require('fs')
 const path = require('path')
-const query = require('../lib/query')
+const { Query, Queries } = require('../lib/query')
 const split = require('binary-split')
 const stread = require('stread')
 const test = require('tap').test
 const { pipeline, Writable } = require('readable-stream')
 
 test('trim', t => {
-  const f = query.trim
-  t.is(typeof f, 'function')
   const strs = [
     '',
     null,
@@ -20,6 +18,7 @@ test('trim', t => {
     'https://abc',
     ' https://abc '
   ]
+
   const wanted = [
     null,
     null,
@@ -29,32 +28,34 @@ test('trim', t => {
     'https://abc/',
     'https://abc/'
   ]
-  strs.forEach((str, i) => { t.is(f(str), wanted[i]) })
+
+  strs.forEach((str, i) => { t.is(Query.trim(str), wanted[i]) })
   t.plan(wanted.length + 1)
 })
 
 test('query', t => {
-  const f = query
   const found = [
-    f('http://5by5.tv/a'),
-    f('http://5by5.tv/b\n', 'Thu Jan 01 1970 01:00:00 GMT+0100 (CET)'),
-    f(' http://5by5.tv/c ', '1970-01-01'),
-    f(' 5by5.tv/d '),
-    f('http://'),
-    f('feed://5by5.tv/f'),
-    f('localhost'),
-    f('https://5by5.tv/h')
+    Query.create('http://5by5.tv/a'),
+    Query.create('http://5by5.tv/b\n', 'Thu Jan 01 1970 01:00:00 GMT+0100 (CET)'),
+    Query.create(' http://5by5.tv/c ', '1970-01-01'),
+    Query.create(' 5by5.tv/d '),
+    Query.create('http://'),
+    Query.create('feed://5by5.tv/f'),
+    Query.create('localhost'),
+    Query.create('https://5by5.tv/h')
   ]
+
   const wanted = [
-    f('http://5by5.tv/a', 0),
-    f('http://5by5.tv/b', 0),
-    f('http://5by5.tv/c', 0),
+    new Query('http://5by5.tv/a', 0),
+    new Query('http://5by5.tv/b', 0),
+    new Query('http://5by5.tv/c', 0),
     null,
     null,
-    f('feed://5by5.tv/f', 0),
+    new Query('feed://5by5.tv/f', 0),
     null,
-    f('https://5by5.tv/h', 0)
+    new Query('https://5by5.tv/h', 0)
   ]
+
   t.plan(wanted.length)
   wanted.forEach((it, i) => {
     t.deepEquals(found.shift(), it)
@@ -62,17 +63,18 @@ test('query', t => {
 })
 
 test('request', t => {
-  const f = query
   const found = [
-    f('http://abc.def/ghi.jkl').request(),
-    f('http://abc.def/ghi.jkl', null, '123').request(),
-    f('https://abc.def/ghi.jkl').request()
+    Query.create('http://abc.def/ghi.jkl').request(),
+    Query.create('http://abc.def/ghi.jkl', null, '123').request(),
+    Query.create('https://abc.def/ghi.jkl').request()
   ]
+
   const headers = {
     accept: '*/*',
     'accept-encoding': 'gzip',
     'user-agent': `nodejs/${process.version}`
   }
+
   const wanted = [
     {
       hostname: 'abc.def',
@@ -99,6 +101,7 @@ test('request', t => {
       headers: headers
     }
   ]
+
   t.plan(wanted.length)
   wanted.forEach((it) => {
     t.same(found.shift(), it)
@@ -107,26 +110,26 @@ test('request', t => {
 
 test('redirect', t => {
   const found = [
-    query('http://abc.de').redirect(301, 'http://fgh.ij'),
-    query('http://abc.de').redirect(301, 'fgh.ij')
+    new Query('http://abc.de').redirect(301, 'http://fgh.ij'),
+    new Query('http://abc.de').redirect(301, 'fgh.ij')
   ]
   const wanted = [
-    query('http://fgh.ij', 0, null, false, 301, 1, 'http://abc.de'),
+    new Query('http://fgh.ij', 0, null, false, 301, 1, 'http://abc.de'),
     null
   ]
   // --
   for (const it of wanted) {
     t.same(found.shift(), it)
   }
-  t.throws(() => { query('http://abc.de').redirect() })
-  t.throws(() => { query('http://abc.de').redirect(301) })
-  t.throws(() => { query('http://abc.de').redirect('hello', 'there') })
+  t.throws(() => { new Query('http://abc.de').redirect() })
+  t.throws(() => { new Query('http://abc.de').redirect(301) })
+  t.throws(() => { new Query('http://abc.de').redirect('hello', 'there') })
   t.end()
 })
 
 test('uri', t => {
-  t.is(query('http://abc.de').redirect(302, 'http://fgh.ij').uri, 'http://abc.de/')
-  t.is(query('http://abc.de').redirect(301, 'http://fgh.ij').uri, 'http://fgh.ij/')
+  t.is(new Query('http://abc.de').redirect(302, 'http://fgh.ij').uri, 'http://abc.de/')
+  t.is(new Query('http://abc.de').redirect(301, 'http://fgh.ij').uri, 'http://fgh.ij/')
   t.end()
 })
 
@@ -137,7 +140,7 @@ test('shield queries', t => {
 
     if (input && wanted) {
       const s = stread(input)
-      const f = new query.Queries()
+      const f = new Queries()
 
       s.on('end', () => {
         f.end()
@@ -158,19 +161,21 @@ test('shield queries', t => {
       t.end()
     }
   }
+
   const wanted = [
     {},
     { er: 'query error: invalid query' },
     { er: 'query error: invalid query' },
     { er: 'query error: invalid query' },
-    { res: [query('http://abc.de')] },
-    { res: [query('http://abc.de')], er: 'query error: invalid query' },
-    { res: [query('http://abc.de')], er: 'query error: invalid JSON' }
+    { res: [new Query('http://abc.de')] },
+    { res: [new Query('http://abc.de')], er: 'query error: invalid query' },
+    { res: [new Query('http://abc.de')], er: 'query error: invalid JSON' }
   ].map((item, index) => {
     // Adding index for easier orientation.
     item.index = index
     return item
   })
+
   go([
     '[]',
     '[{}]',
@@ -190,7 +195,7 @@ test('all queries', t => {
   pipeline(
     fs.createReadStream(p),
     split(),
-    new query.Queries(),
+    new Queries(),
     new Writable({
       objectMode: true,
       write (chunk, enc, cb) {
@@ -202,11 +207,11 @@ test('all queries', t => {
       if (error) throw error
 
       const wanted = [
-        query('http://just/b2w.xml'),
-        query('http://some/ddc.xml'),
-        query('http://feeds/rl.xml'),
-        query('http://for/rz.xml'),
-        query('http://testing/tal.xml')
+        new Query('http://just/b2w.xml'),
+        new Query('http://some/ddc.xml'),
+        new Query('http://feeds/rl.xml'),
+        new Query('http://for/rz.xml'),
+        new Query('http://testing/tal.xml')
       ]
 
       t.is(found.length, wanted.length)

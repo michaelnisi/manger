@@ -5,6 +5,7 @@ module.exports = {
   teardown
 }
 
+const assert = require('assert')
 const rimraf = require('rimraf')
 const { Manger } = require('../../')
 const { createLevelDB } = require('../../lib/db')
@@ -23,6 +24,7 @@ function createManger (custom) {
 
 function teardown (cache, cb) {
   const { db } = cache
+  assert(db)
 
   db.close((er) => {
     if (er) throw er
