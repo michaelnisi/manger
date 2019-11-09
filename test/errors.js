@@ -3,7 +3,7 @@
 const common = require('./lib/common')
 const { test } = require('tap')
 
-test('queries and requests', { skip: true }, t => {
+test('queries and requests', t => {
   function go (s, t, cb) {
     const found = []
 
@@ -11,32 +11,32 @@ test('queries and requests', { skip: true }, t => {
       found.push(er)
     })
 
-    let buf = ''
+    const acc = []
 
     s.on('readable', () => {
       let chunk
-      while ((chunk = s.read()) !== null) { buf += chunk }
+      while ((chunk = s.read()) !== null) { acc.push(chunk) }
     })
 
     // Failed requests are cached, an error is emitted only for the first
     // failure per URL. Invalid queries do not produce requests, so errors
     // are emitted for each of those.
     const wanted = [
-      'invalid query',
-      'getaddrinfo ENOTFOUND',
-      'invalid query',
+      'ERR_INVALID_URL',
+      'ENOTFOUND',
+      'ERR_INVALID_URL',
       'invalid protocol'
     ]
 
     s.on('end', () => {
-      t.same(buf, '')
+      t.same(acc.toString(), '[]')
       t.is(found.length, wanted.length)
 
-      console.log(found)
+      for (const it of wanted) {
+        const { code, message } = found.shift()
+        code ? t.is(code, it) : t.is(message, it)
+      }
 
-      wanted.forEach((it) => {
-        t.ok(found.shift().message.match(new RegExp(it)))
-      })
       cb()
     })
 

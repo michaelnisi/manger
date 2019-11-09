@@ -51,7 +51,7 @@ test('ENOTFOUND', t => {
   })
 
   const uri = 'http://nowhere'
-  const qry = Query.create(uri, null, null, true)
+  const qry = new Query(uri, null, null, true)
 
   feeds.end(qry)
 })

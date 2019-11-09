@@ -10,9 +10,6 @@ const { pipeline, Writable } = require('readable-stream')
 
 test('trim', t => {
   const strs = [
-    '',
-    null,
-    'abc',
     'http://abc',
     ' http://abc ',
     'https://abc',
@@ -20,9 +17,6 @@ test('trim', t => {
   ]
 
   const wanted = [
-    null,
-    null,
-    null,
     'http://abc/',
     'http://abc/',
     'https://abc/',
@@ -30,43 +24,47 @@ test('trim', t => {
   ]
 
   strs.forEach((str, i) => { t.is(Query.trim(str), wanted[i]) })
-  t.plan(wanted.length + 1)
+
+  t.throws(() => { Query.trim('') })
+  t.throws(() => { Query.trim(null) })
+  t.throws(() => { Query.trim('abc') })
+
+  t.end()
 })
 
 test('query', t => {
+  t.throws(() => { return new Query(' 5by5.tv/d ') })
+  t.throws(() => { return new Query('http://') })
+  t.throws(() => { return new Query('localhost') })
+
   const found = [
-    Query.create('http://5by5.tv/a'),
-    Query.create('http://5by5.tv/b\n', 'Thu Jan 01 1970 01:00:00 GMT+0100 (CET)'),
-    Query.create(' http://5by5.tv/c ', '1970-01-01'),
-    Query.create(' 5by5.tv/d '),
-    Query.create('http://'),
-    Query.create('feed://5by5.tv/f'),
-    Query.create('localhost'),
-    Query.create('https://5by5.tv/h')
+    new Query('http://5by5.tv/a'),
+    new Query('http://5by5.tv/b\n', 'Thu Jan 01 1970 01:00:00 GMT+0100 (CET)'),
+    new Query(' http://5by5.tv/c ', '1970-01-01'),
+    new Query('feed://5by5.tv/f'),
+    new Query('https://5by5.tv/h')
   ]
 
   const wanted = [
     new Query('http://5by5.tv/a', 0),
     new Query('http://5by5.tv/b', 0),
     new Query('http://5by5.tv/c', 0),
-    null,
-    null,
     new Query('feed://5by5.tv/f', 0),
-    null,
     new Query('https://5by5.tv/h', 0)
   ]
 
-  t.plan(wanted.length)
-  wanted.forEach((it, i) => {
+  for (const it of wanted) {
     t.deepEquals(found.shift(), it)
-  })
+  }
+
+  t.end()
 })
 
 test('request', t => {
   const found = [
-    Query.create('http://abc.def/ghi.jkl').request(),
-    Query.create('http://abc.def/ghi.jkl', null, '123').request(),
-    Query.create('https://abc.def/ghi.jkl').request()
+    new Query('http://abc.def/ghi.jkl').request(),
+    new Query('http://abc.def/ghi.jkl', null, '123').request(),
+    new Query('https://abc.def/ghi.jkl').request()
   ]
 
   const headers = {
@@ -103,33 +101,36 @@ test('request', t => {
   ]
 
   t.plan(wanted.length)
-  wanted.forEach((it) => {
+
+  for (const it of wanted) {
     t.same(found.shift(), it)
-  })
+  }
 })
 
 test('redirect', t => {
   const found = [
-    new Query('http://abc.de').redirect(301, 'http://fgh.ij'),
-    new Query('http://abc.de').redirect(301, 'fgh.ij')
+    new Query('http://abc.de').redirect(301, 'http://fgh.de')
   ]
+
   const wanted = [
-    new Query('http://fgh.ij', 0, null, false, 301, 1, 'http://abc.de'),
-    null
+    new Query('http://fgh.de', 0, null, false, 301, 1, 'http://abc.de')
   ]
-  // --
+
   for (const it of wanted) {
     t.same(found.shift(), it)
   }
+
   t.throws(() => { new Query('http://abc.de').redirect() })
   t.throws(() => { new Query('http://abc.de').redirect(301) })
   t.throws(() => { new Query('http://abc.de').redirect('hello', 'there') })
+  t.throws(() => { new Query('http://abc.de').redirect('fgh.de') })
+
   t.end()
 })
 
 test('uri', t => {
-  t.is(new Query('http://abc.de').redirect(302, 'http://fgh.ij').uri, 'http://abc.de/')
-  t.is(new Query('http://abc.de').redirect(301, 'http://fgh.ij').uri, 'http://fgh.ij/')
+  t.is(new Query('http://abc.de').redirect(302, 'http://fgh.de').uri, 'http://abc.de/')
+  t.is(new Query('http://abc.de').redirect(301, 'http://fgh.de').uri, 'http://fgh.de/')
   t.end()
 })
 
@@ -164,12 +165,12 @@ test('shield queries', t => {
 
   const wanted = [
     {},
-    { er: 'query error: invalid query' },
-    { er: 'query error: invalid query' },
-    { er: 'query error: invalid query' },
+    { er: 'invalid query' },
+    { er: 'invalid query' },
+    { er: 'invalid query' },
     { res: [new Query('http://abc.de')] },
-    { res: [new Query('http://abc.de')], er: 'query error: invalid query' },
-    { res: [new Query('http://abc.de')], er: 'query error: invalid JSON' }
+    { res: [new Query('http://abc.de')], er: 'invalid query' },
+    { res: [new Query('http://abc.de')], er: 'invalid JSON' }
   ].map((item, index) => {
     // Adding index for easier orientation.
     item.index = index

@@ -3,7 +3,7 @@
 const common = require('./lib/common')
 const bytewise = require('bytewise')
 const lru = require('lru-cache')
-const rank = require('../lib/rank')
+const { allFeedURLs, updateFeedRanking } = require('../lib/ranking')
 const schema = require('../lib/schema')
 const test = require('tap').test
 
@@ -18,7 +18,7 @@ test('allFeeds', { skip: false }, (t) => {
   const cache = common.createManger()
   const db = cache.db
 
-  const uris = ['abc', 'def', 'ghi']
+  const uris = ['https://abc.de/', 'https://def.de/', 'https://ghi.de/']
   const ops = uris.map(uri => {
     const key = schema.feed(uri)
 
@@ -30,9 +30,7 @@ test('allFeeds', { skip: false }, (t) => {
   db.batch(ops, (er) => {
     if (er) throw er
 
-    const f = rank.allFeeds
-
-    f(db, (er, found) => {
+    allFeedURLs(db, (er, found) => {
       if (er) throw er
       const wanted = uris
       t.same(found, wanted)
@@ -47,9 +45,9 @@ test('allFeeds', { skip: false }, (t) => {
 
 test('rank', (t) => {
   const counts = [
-    QueryCount('abc', 3),
-    QueryCount('def', 1),
-    QueryCount('ghi', 2)
+    QueryCount('https://abc.de/', 3),
+    QueryCount('https://def.de/', 1),
+    QueryCount('https://ghi.de/', 2)
   ]
   const cache = lru()
 
@@ -60,7 +58,7 @@ test('rank', (t) => {
     return { type: 'put', key: key, value: c.count }
   })
 
-  const uncounted = ['jkl', 'mno', 'pqr']
+  const uncounted = ['https://jkl.de/', 'https://mno.de', 'https://pqr.de']
 
   uncounted.forEach(uri => {
     const key = schema.feed(uri)
@@ -77,18 +75,18 @@ test('rank', (t) => {
   db.batch(ops, (er) => {
     if (er) throw er
     t.pass('batch applied callback')
-    cache.set('jkl', 5)
+    cache.set('https://jkl.de/', 5)
 
-    rank(db, cache, (er, count) => {
+    updateFeedRanking(db, cache, (er, count) => {
       if (er) throw er
 
       const wanted = [
-        ['manger', ['rank', 6, 'abc']],
-        ['manger', ['rank', 5, 'jkl']],
-        ['manger', ['rank', 4, 'ghi']],
-        ['manger', ['rank', 2, 'def']],
-        ['manger', ['rank', 0, 'pqr']],
-        ['manger', ['rank', 0, 'mno']]
+        ['manger', ['rank', 6, 'https://abc.de/']],
+        ['manger', ['rank', 5, 'https://jkl.de/']],
+        ['manger', ['rank', 4, 'https://ghi.de/']],
+        ['manger', ['rank', 2, 'https://def.de/']],
+        ['manger', ['rank', 0, 'https://pqr.de/']],
+        ['manger', ['rank', 0, 'https://mno.de/']]
       ]
 
       t.is(count, wanted.length)

@@ -1,7 +1,7 @@
 'use strict'
 
-const test = require('tap').test
-const { decode } = require('charwise')
+const { test } = require('tap')
+const { decode } = require('bytewise')
 
 const {
   URIFromFeed,

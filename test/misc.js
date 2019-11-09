@@ -85,10 +85,10 @@ test('compare etags', t => {
 
 test('process query', t => {
   const wanted = [
-    Query.create('https://abc.de/'),
-    Query.create('https://abc.de/'),
-    Query.create('https://abc.de/', undefined, undefined, true),
-    Query.create('https://abc.de/', undefined, undefined, true)
+    new Query('https://abc.de/'),
+    new Query('https://abc.de/'),
+    new Query('https://abc.de/', undefined, undefined, true),
+    new Query('https://abc.de/', undefined, undefined, true)
   ]
 
   function Surrogate (force) {
