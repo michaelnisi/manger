@@ -1,9 +1,9 @@
 'use strict'
 
-const StringDecoder = require('string_decoder').StringDecoder
+const { StringDecoder } = require('string_decoder')
 const common = require('./lib/common')
 const http = require('http')
-const test = require('tap').test
+const { test } = require('tap')
 const { URL } = require('url')
 
 const cache = common.createManger()

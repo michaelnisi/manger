@@ -4,7 +4,7 @@ const assert = require('assert')
 const common = require('./lib/common')
 const http = require('http')
 const stream = require('readable-stream')
-const test = require('tap').test
+const { test } = require('tap')
 
 test('plain feed caching', (t) => {
   t.plan(9, 'second request should not hit server')

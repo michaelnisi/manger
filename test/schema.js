@@ -17,11 +17,9 @@ const {
 } = require('../lib/schema')
 
 function is (found, wanted, t) {
-  wanted.forEach(it => {
-    const that = decode(found.shift())
-
-    t.same(that, it)
-  })
+  for (const it of wanted) {
+    t.same(decode(found.shift()), it)
+  }
 
   t.is(found.length, 0)
 

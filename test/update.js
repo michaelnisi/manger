@@ -1,20 +1,21 @@
 'use strict'
 
-const common = require('./lib/common')
-const fs = require('fs')
-const http = require('http')
-const path = require('path')
 const split = require('binary-split')
-const stream = require('readable-stream')
-const test = require('tap').test
+const { Transform } = require('readable-stream')
+const { basename, join } = require('path')
+const { createManger, teardown } = require('./lib/common')
+const { createReadStream } = require('fs')
+const { createServer } = require('http')
 const { format } = require('url')
+const { test } = require('tap')
 
-test('not modified', (t) => {
+test('not modified', t => {
   const go = () => {
-    const store = common.createManger()
+    const store = createManger()
     const feeds = store.feeds()
-    const p = path.join(__dirname, 'data', 'ALL')
-    const input = fs.createReadStream(p)
+    const p = join(__dirname, 'data', 'ALL')
+    const input = createReadStream(p)
+
     const update = () => {
       store.update((error, updated) => {
         if (error) throw error
@@ -26,7 +27,7 @@ test('not modified', (t) => {
         server.close((er) => {
           if (er) throw er
           t.pass('should close server')
-          common.teardown(store, (er) => {
+          teardown(store, (er) => {
             if (er) throw er
             t.pass('should teardown')
             t.end()
@@ -51,7 +52,7 @@ test('not modified', (t) => {
     GET: []
   }
 
-  const server = http.createServer((req, res) => {
+  const server = createServer((req, res) => {
     fixtures[req.method].shift()(req, res)
   }).listen(1337, (er) => {
     if (er) throw er
@@ -59,20 +60,22 @@ test('not modified', (t) => {
     go()
   })
 
-  const setup = new stream.Transform()
+  const setup = new Transform()
   const headers = {
     'content-type': 'text/xml; charset=UTF-8',
     ETag: '55346232-18151'
   }
   setup._transform = (chunk, enc, cb) => {
     const uri = new URL('' + chunk)
-    const route = '/' + path.basename(format(uri))
+    const route = '/' + basename(format(uri))
     const filename = route + '.xml'
 
     fixtures.GET.push((req, res) => {
       res.writeHead(200, headers)
-      const p = path.join(__dirname, 'data', filename)
-      fs.createReadStream(p).pipe(res)
+
+      const p = join(__dirname, 'data', filename)
+
+      createReadStream(p).pipe(res)
     })
 
     fixtures.HEAD.push((req, res) => {

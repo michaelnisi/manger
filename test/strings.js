@@ -1,7 +1,7 @@
 'use strict'
 
 const { html, entryID, duration, entryLink } = require('../lib/strings')
-const test = require('tap').test
+const { test } = require('tap')
 
 test('html', t => {
   t.is(html({}), undefined)
@@ -32,9 +32,10 @@ test('entry identity', (t) => {
   ]
 
   t.plan(wanted.length)
-  wanted.forEach((it) => {
+
+  for (const it of wanted) {
     t.same(found.shift(), it)
-  })
+  }
 })
 
 test('duration', (t) => {
@@ -64,9 +65,10 @@ test('duration', (t) => {
   ]
 
   t.plan(wanted.length)
-  wanted.forEach((it) => {
+
+  for (const it of wanted) {
     t.same(found.shift(), it)
-  })
+  }
 })
 
 test('entry link', (t) => {
@@ -100,5 +102,8 @@ test('entry link', (t) => {
   ]
 
   t.plan(wanted.length)
-  wanted.forEach(item => { t.same(found.shift(), item) })
+
+  for (const it of wanted) {
+    t.same(found.shift(), it)
+  }
 })

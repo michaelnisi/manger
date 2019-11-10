@@ -35,6 +35,7 @@
     "readable-stream": "^3.4.0"
   },
   "devDependencies": {
+    "@types/node": "^12.12.7",
     "binary-split": "^1.0.5",
     "rimraf": "^2.6.1",
     "standard": "^12.0.1",

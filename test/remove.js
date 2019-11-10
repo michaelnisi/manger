@@ -4,7 +4,7 @@ const common = require('./lib/common')
 const fs = require('fs')
 const http = require('http')
 const path = require('path')
-const test = require('tap').test
+const { test } = require('tap')
 
 const cache = common.createManger()
 

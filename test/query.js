@@ -5,7 +5,7 @@ const path = require('path')
 const { Query, Queries } = require('../lib/query')
 const split = require('binary-split')
 const stread = require('stread')
-const test = require('tap').test
+const { test } = require('tap')
 const { pipeline, Writable } = require('readable-stream')
 
 test('trim', t => {

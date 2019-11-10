@@ -5,7 +5,7 @@ const bytewise = require('bytewise')
 const lru = require('lru-cache')
 const { allFeedURLs, updateFeedRanking } = require('../lib/ranking')
 const schema = require('../lib/schema')
-const test = require('tap').test
+const { test } = require('tap')
 
 function QueryCount (uri, count) {
   if (!(this instanceof QueryCount)) return new QueryCount(uri, count)
