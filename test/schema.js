@@ -1,7 +1,6 @@
 'use strict'
 
 const { test } = require('tap')
-const { decode } = require('bytewise')
 
 const {
   URIFromFeed,
@@ -13,8 +12,11 @@ const {
   feed,
   rank,
   ranked,
-  ranks
+  ranks,
+  keyEncoding
 } = require('../lib/schema')
+
+const { decode } = keyEncoding
 
 function is (found, wanted, t) {
   for (const it of wanted) {
@@ -62,15 +64,15 @@ test('URI from rank', t => {
 test('ranks', t => {
   const { gte, lte } = ranks(50)
 
-  t.is(gte.toString(), 'a0706d616e67657200a07072616e6b00420000000000000000100000')
-  t.is(lte.toString(), 'a0706d616e67657200a07072616e6b0043f00000')
+  t.is(gte.toString(), 'KJmanger"KJrank"FE  0M0"A!!')
+  t.is(lte.toString(), 'KJmanger"KJrank"FF"L!!')
   t.end()
 })
 
 test('ranked', t => {
   const uri = 'http://abc.de/'
 
-  t.is(ranked(uri).toString(), 'a0706d616e67657200a07072616e6b65640070687474703a2f2f6162632e64652f000000')
+  t.is(ranked(uri).toString(), 'KJmanger"KJranked"Jhttp://abc.de/!!')
   t.end()
 })
 

@@ -1,26 +1,27 @@
 'use strict'
 
-const common = require('./lib/common')
-const bytewise = require('bytewise')
+const { createManger, teardown } = require('./lib/common')
 const lru = require('lru-cache')
 const { allFeedURLs, updateFeedRanking } = require('../lib/ranking')
-const schema = require('../lib/schema')
+const { keyEncoding, feed, rank, allRanks } = require('../lib/schema')
 const { test } = require('tap')
 
-function QueryCount (uri, count) {
-  if (!(this instanceof QueryCount)) return new QueryCount(uri, count)
+const { decode } = keyEncoding
 
-  this.uri = uri
-  this.count = count
+class QueryCount {
+  constructor (uri, count) {
+    this.uri = uri
+    this.count = count
+  }
 }
 
 test('allFeeds', { skip: false }, (t) => {
-  const cache = common.createManger()
+  const cache = createManger()
   const db = cache.db
 
   const uris = ['https://abc.de/', 'https://def.de/', 'https://ghi.de/']
   const ops = uris.map(uri => {
-    const key = schema.feed(uri)
+    const key = feed(uri)
 
     return { type: 'put', key: key, value: '{}' }
   })
@@ -35,7 +36,7 @@ test('allFeeds', { skip: false }, (t) => {
       const wanted = uris
       t.same(found, wanted)
 
-      common.teardown(cache, (er) => {
+      teardown(cache, (er) => {
         if (er) throw er
         t.pass('should teardown')
       })
@@ -45,29 +46,29 @@ test('allFeeds', { skip: false }, (t) => {
 
 test('rank', (t) => {
   const counts = [
-    QueryCount('https://abc.de/', 3),
-    QueryCount('https://def.de/', 1),
-    QueryCount('https://ghi.de/', 2)
+    new QueryCount('https://abc.de/', 3),
+    new QueryCount('https://def.de/', 1),
+    new QueryCount('https://ghi.de/', 2)
   ]
   const cache = lru()
 
   counts.forEach(c => { cache.set(c.uri, c.count) })
 
   const ops = counts.map(c => {
-    const key = schema.rank(c.uri, c.count)
+    const key = rank(c.uri, c.count)
     return { type: 'put', key: key, value: c.count }
   })
 
   const uncounted = ['https://jkl.de/', 'https://mno.de', 'https://pqr.de']
 
   uncounted.forEach(uri => {
-    const key = schema.feed(uri)
+    const key = feed(uri)
     const op = { type: 'put', key: key, value: '{}' }
 
     ops.push(op)
   })
 
-  const store = common.createManger()
+  const store = createManger()
   const db = store.db
 
   t.plan(6)
@@ -92,13 +93,13 @@ test('rank', (t) => {
       t.is(count, wanted.length)
       t.pass('rank applied callback')
 
-      const opts = schema.allRanks
+      const opts = allRanks
       opts.reverse = true
       const s = db.createKeyStream(opts)
       const found = []
 
       s.on('data', (chunk) => {
-        found.push(bytewise.decode(chunk))
+        found.push(decode(chunk))
       })
 
       s.on('end', () => {
@@ -108,7 +109,7 @@ test('rank', (t) => {
           if (er) throw er
           t.pass('should reset ranks')
 
-          common.teardown(store, (er) => {
+          teardown(store, (er) => {
             if (er) throw er
             t.pass('should teardown')
           })
