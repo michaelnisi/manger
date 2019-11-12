@@ -92,6 +92,13 @@ test('remove', t => {
   })
 })
 
+test('remove non-existent', t => {
+  cache.remove('http://abc.de/', er => {
+    t.ok(er)
+    t.end()
+  })
+})
+
 test('teardown', t => {
   common.teardown(cache, (er) => {
     if (er) throw er
