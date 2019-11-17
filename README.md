@@ -1,18 +1,9 @@
 [![Build Status](https://secure.travis-ci.org/michaelnisi/manger.svg)](http://travis-ci.org/michaelnisi/manger)
 [![Coverage Status](https://coveralls.io/repos/github/michaelnisi/manger/badge.svg?branch=master)](https://coveralls.io/github/michaelnisi/manger?branch=master)
 
-
-# TODO:
-
-Pass tests
-
-x query
-x schema
-x strings
-
 # manger - cache feeds
 
-The **manger** [Node.js](http://nodejs.org/) package provides caching for RSS and Atom formatted XML feeds, it implements an interface to query entries by feed and time. The obvious challenge here is to build a resilient system facing potentially misconfigured servers and malformed feeds. Sometimes, archiving these random inputs like a web crawler, waste recycling comes to mind.
+The **manger** [Node.js](http://nodejs.org/) package provides caching for RSS and Atom formatted XML feeds, it implements an interface to query entries by feed and time. The obvious challenge here is to build a resilient system facing potentially misconfigured servers and malformed feeds. Transforming these messy feeds, waste recycling comes to mind.
 
 ## Types
 
@@ -78,9 +69,9 @@ Why SHA-1, cryptographic hashing, to produce the `id` property?
 
 Read more [here](https://stackoverflow.com/questions/28792784/why-does-git-use-a-cryptographic-hash-function).
 
-### query()
+### Query
 
-A query to get a feed or entries of a feed in a time range between `Date.now()` and `since`. Conceptually consequent, but semantically inaccurate, the `since` date is exclusive. If you pass the `updated` date of the latest entry received, this entry will not be included in the response.
+A Query to get a feed or entries of a feed in a time range between `Date.now()` and `since`. Conceptually consequent, but semantically inaccurate, the `since` date is exclusive. If you pass the `updated` date of the latest entry received, this entry will not be included in the response.
 
 - `url` `String()`
 - `since` [`Date()`](https://developer.mozilla.org/en/docs/Web/JavaScript/Reference/Global_Objects/Date) `| void()`
@@ -208,9 +199,9 @@ The **manger** module decorates the exported `Manger` constructor with two conve
 
 A failable factory function returning a valid [`query()`](#query) or `null`.
 
-### manger.queries()
+### Queries
 
-This stream transforms JSON to queries which can be piped to `feeds()` and `entries()` streams. The expected JSON input format:
+The `manger.Queries` class transforms JSON to queries which can be piped to `feeds()` and `entries()` streams. The expected JSON input format:
 
 ```js
 [
@@ -224,10 +215,6 @@ This stream transforms JSON to queries which can be piped to `feeds()` and `entr
 ```
 
 Where `"since"` can be anything `Date()` is able to parse.
-
-#### Event: 'warn'
-
-To make piping easier, not breaking pipes, the queries stream emits a `'warning'` event instead of an `'error'` event if it encounters an invalid query. General stream errors, of course, are still emitted nevertheless.
 
 ## Installation
 

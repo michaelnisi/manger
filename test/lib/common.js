@@ -7,8 +7,7 @@ module.exports = {
 
 const assert = require('assert')
 const rimraf = require('rimraf')
-const { Manger } = require('../../')
-const { createLevelDB } = require('../../lib/db')
+const { Manger, createLevelDB } = require('../../')
 const { defaults } = require('../../lib/init')
 
 /**
