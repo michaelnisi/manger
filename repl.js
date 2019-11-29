@@ -1,16 +1,22 @@
 #!/usr/bin/env node
 'use strict'
 
-// repl - explore manger
+// repl - kick the tires during development
 
 const fs = require('fs')
 const repl = require('repl')
 const split = require('binary-split')
-const { Manger } = require('./')
+const { Manger, createLevelDB } = require('./')
 const { clear, dir, log } = require('console')
 
-const name = process.argv[2] || '/tmp/manger-repl'
-const cache = new Manger(name, { objectMode: true })
+function createManger () {
+  const name = process.argv[2] || '/tmp/manger-repl'
+  const db = createLevelDB(name)
+
+  return new Manger(db, { objectMode: true })
+}
+
+const cache = createManger()
 
 const server = repl.start({
   ignoreUndefined: true,
@@ -20,8 +26,16 @@ const server = repl.start({
   useColors: true
 })
 
-// Prints objects, or one of their properties, read from stream.
+/**
+ * Prints objects, or one of their properties, read from stream.
+ *
+ * @param {Readable} s A readable stream.
+ * @param {string} prop A property name for filtering.
+ */
 function read (s, prop) {
+  // Reading manually – pipeline wouldn’t be a good fit because error
+  // forwarding would stall our stream, but here we want to keep reading
+  // all the way to the end.
   s.once('error', er => {
     log(er)
   }).on('readable', () => {
@@ -38,7 +52,11 @@ function read (s, prop) {
   })
 }
 
-// Fills the cache with some feeds.
+/**
+ * Fills the cache with some feeds.
+ *
+ * @param {string} prop The propery name to log (`title` by default).
+ */
 function fill (prop = 'title') {
   read(fs.createReadStream('./test/data/feeds')
     .pipe(split())
@@ -51,8 +69,14 @@ context.clear = clear
 context.fill = fill
 context.read = read
 
-Object.getOwnPropertyNames(Manger.prototype).forEach(name => {
-  const f = cache[name]
-  if (name === 'constructor' || typeof f !== 'function') return
-  context[name] = f.bind(cache)
-})
+function bindCache () {
+  for (const name of Object.getOwnPropertyNames(Manger.prototype)) {
+    const f = cache[name]
+
+    if (name === 'constructor' || typeof f !== 'function') return
+
+    context[name] = f.bind(cache)
+  }
+}
+
+bindCache()
