@@ -1,13 +1,12 @@
-'use strict'
-
 // manger - cache feeds
+// @ts-check
 
-const { Entries } = require('./lib/entries')
-const { Feeds, URLs, FeedURLs } = require('./lib/feeds')
-const { Manger } = require('./lib/manger')
-const { Opts } = require('./lib/init')
-const { Queries, Query } = require('./lib/query')
-const { createLevelDB } = require('./lib/db')
+const {Entries} = require('./lib/entries');
+const {Feeds, URLs, FeedURLs} = require('./lib/feeds');
+const {Manger} = require('./lib/manger');
+const {Opts} = require('./lib/init');
+const {Queries, Query} = require('./lib/query');
+const {createLevelDB} = require('./lib/db');
 
 module.exports = {
   Entries,
@@ -18,5 +17,5 @@ module.exports = {
   Queries,
   Query,
   URLs,
-  createLevelDB
-}
+  createLevelDB,
+};

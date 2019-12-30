@@ -4,8 +4,8 @@
   "description": "cache feeds",
   "main": "index.js",
   "scripts": {
-    "pretest": "standard",
-    "test": "tap test/*.js -j1 -b --100",
+    "pretest": "eslint *.js ./lib/*.js --fix",
+    "test": "tap test/*.js -j1 -b",
     "posttest": "rm -rf /tmp/manger-[1-9]* "
   },
   "repository": {
@@ -15,13 +15,7 @@
   "bugs": {
     "url": "https://github.com/michaelnisi/manger/issues"
   },
-  "keywords": [
-    "rss",
-    "atom",
-    "xml",
-    "feed",
-    "cache"
-  ],
+  "keywords": ["rss", "atom", "xml", "feed", "cache"],
   "license": "MIT",
   "homepage": "https://github.com/michaelnisi/manger",
   "dependencies": {
@@ -34,10 +28,14 @@
     "readable-stream": "^3.4.0"
   },
   "devDependencies": {
-    "@types/node": "^12.12.7",
+    "@types/node": "^13.1.1",
+    "@types/readable-stream": "^2.3.5",
     "binary-split": "^1.0.5",
+    "eslint": "^6.8.0",
+    "eslint-config-fbjs-opensource": "^2.0.1",
+    "eslint-plugin-import": "^2.19.1",
+    "prettier": "^1.19.1",
     "rimraf": "^2.6.1",
-    "standard": "^12.0.1",
     "stread": "^3.0.1",
     "tap": "^14.2.2"
   },
