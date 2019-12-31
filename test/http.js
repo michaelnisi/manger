@@ -1,4 +1,4 @@
-// @ts-check
+// http - HTTP tests
 
 const http = require('http');
 const path = require('path');
@@ -65,7 +65,7 @@ test('ETag', t => {
 
   const headers = {
     'content-type': 'text/xml; charset=UTF-8',
-    'ETag': '55346232-18151',
+    ETag: '55346232-18151',
     'content-encoding': 'gzip',
   };
   const diffs = [
@@ -85,11 +85,11 @@ test('ETag', t => {
 
       if (diff.method === 'GET') {
         const wanted = {
-          'accept': '*/*',
+          accept: '*/*',
           'accept-encoding': 'gzip',
-          'host': 'localhost:1337',
+          host: 'localhost:1337',
           'user-agent': `nodejs/${process.version}`,
-          'connection': 'close',
+          connection: 'close',
         };
         const found = req.headers;
 
@@ -97,12 +97,12 @@ test('ETag', t => {
         createFileStream('b2w.xml', true).pipe(res);
       } else if (diff.method === 'HEAD') {
         const wanted = {
-          'accept': '*/*',
+          accept: '*/*',
           'accept-encoding': 'gzip',
-          'host': 'localhost:1337',
+          host: 'localhost:1337',
           'if-none-match': '55346232-18151',
           'user-agent': `nodejs/${process.version}`,
-          'connection': 'close',
+          connection: 'close',
         };
         const found = req.headers;
         t.same(found, wanted, 'should send required headers');
@@ -289,7 +289,7 @@ function done(server, cache, t, cb) {
 test('HEAD 404', t => {
   const headers = {
     'content-type': 'text/xml; charset=UTF-8',
-    'ETag': '55346232-18151',
+    ETag: '55346232-18151',
   };
 
   const fixtures = [
@@ -322,35 +322,47 @@ test('HEAD 404', t => {
   ];
 
   const go = () => {
+    t.plan(16);
+
     const store = createManger();
     const feeds = store.feeds();
+
     feeds.on('error', er => {
       t.is(er.message, 'quaint HTTP status: 404 from localhost:1337');
     });
+
     let chunks = '';
+
     feeds.on('readable', () => {
       let chunk;
       while ((chunk = feeds.read()) !== null) {
         chunks += chunk;
       }
     });
+
     feeds.on('end', () => {
       JSON.parse(chunks);
-      done(server, store, t);
+      done(server, store, t, er => {
+        if (er) {
+          throw er;
+        }
+
+        t.end();
+      });
     });
 
     const url = 'http://localhost:1337/b2w.xml';
+
     t.ok(feeds.write(url));
     t.ok(feeds.write(url), 'should be cached');
 
     const qry = new Query({url, force: true});
+
     t.ok(feeds.write(qry));
     t.ok(feeds.write(qry));
 
     feeds.end();
   };
-
-  t.plan(16);
 
   const server = http
     .createServer((req, res) => {
@@ -422,7 +434,7 @@ test('HEAD ECONNREFUSED', t => {
 
       const headers = {
         'content-type': 'text/xml; charset=UTF-8',
-        'ETag': '55346232-18151',
+        ETag: '55346232-18151',
       };
 
       res.writeHead(200, headers);
@@ -464,7 +476,7 @@ test('HEAD socket hangup', t => {
 
   const headers = {
     'content-type': 'text/xml; charset=UTF-8',
-    'ETag': '55346232-18151',
+    ETag: '55346232-18151',
   };
 
   const fixtures = [

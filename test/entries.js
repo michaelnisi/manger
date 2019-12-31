@@ -1,5 +1,3 @@
-// TODO: Reduce timeout
-
 const assert = require('assert');
 const common = require('./lib/common');
 const debug = require('util').debuglog('manger');
@@ -18,7 +16,9 @@ test('all', t => {
 
   function setup(acc, zip) {
     const headers = {'Content-Type': 'text/xml; charset=UTF-8'};
-    if (zip) { headers['Content-Encoding'] = 'gzip'; }
+    if (zip) {
+      headers['Content-Encoding'] = 'gzip';
+    }
 
     acc.push((req, res) => {
       res.writeHead(200, headers);
@@ -36,19 +36,25 @@ test('all', t => {
   const fixtures = setup([]);
   t.is(fixtures.length, 2);
 
-  const server = http.createServer((req, res) => {
-    t.pass();
+  const server = http
+    .createServer((req, res) => {
+      t.pass();
 
-    fixtures.shift()(req, res);
-  }).listen(1337, 'localhost', er => {
-    if (er) { throw er; }
-    t.pass();
-  });
+      fixtures.shift()(req, res);
+    })
+    .listen(1337, 'localhost', er => {
+      if (er) {
+        throw er;
+      }
+      t.pass();
+    });
 
   function go(times) {
     if (times === 0) {
       return server.close(er => {
-        if (er) { throw er; }
+        if (er) {
+          throw er;
+        }
         t.pass();
       });
     }
@@ -56,14 +62,20 @@ test('all', t => {
     const entries = cache.entries();
     assert(entries instanceof Readable, 'should be Readable');
     let chunks = '';
-    entries.on('error', er => { throw er; });
-    entries.on('data', chunk => { chunks += chunk; });
+    entries.on('error', er => {
+      throw er;
+    });
+    entries.on('data', chunk => {
+      chunks += chunk;
+    });
     entries.once('end', () => {
       const found = JSON.parse(chunks);
       t.is(found.length, 150 * 2);
       t.is(cache.counter.itemCount, 1);
       common.teardown(cache, er => {
-        if (er) { throw er; }
+        if (er) {
+          throw er;
+        }
         go(--times);
       });
     });
@@ -86,18 +98,22 @@ test('time range', t => {
     const uri = new URL(origin);
     const port = uri.port;
 
-    const server = http.createServer((req, res) => {
-      const name = uri.pathname;
-      t.is(req.url, name);
+    const server = http
+      .createServer((req, res) => {
+        const name = uri.pathname;
+        t.is(req.url, name);
 
-      res.writeHead(200, headers);
+        res.writeHead(200, headers);
 
-      const p = path.join(__dirname, 'data', name + '.xml');
-      fs.createReadStream(p).pipe(res);
-    }).listen(port, er => {
-      if (er) { throw er; }
-      t.pass(`should listen on port ${port}`);
-    });
+        const p = path.join(__dirname, 'data', name + '.xml');
+        fs.createReadStream(p).pipe(res);
+      })
+      .listen(port, er => {
+        if (er) {
+          throw er;
+        }
+        t.pass(`should listen on port ${port}`);
+      });
 
     acc.push(server);
 
@@ -135,9 +151,13 @@ test('time range', t => {
   };
 
   const handle = (er, chunks, cb) => {
-    if (er) { throw er; }
+    if (er) {
+      throw er;
+    }
     const found = JSON.parse(chunks);
-    found.forEach(entry => { debug('*** %s', entry.title); });
+    found.forEach(entry => {
+      debug('*** %s', entry.title);
+    });
     t.is(found.length, 1, 'edge cases should be exclusive');
     t.is(found[0].title, '23: Morality 2.0');
     cb();
@@ -149,10 +169,14 @@ test('time range', t => {
       go((er, cached) => {
         handle(er, cached, () => {
           common.teardown(store, er => {
-            if (er) { throw er; }
+            if (er) {
+              throw er;
+            }
             servers.forEach(server => {
               server.close(er => {
-                if (er) { throw er; }
+                if (er) {
+                  throw er;
+                }
                 t.pass('should close server');
               });
             });
@@ -181,8 +205,11 @@ const read = (entries, uri, cb) => {
         chunks.push(chunk);
         cb();
       },
-    }), error => {
-      if (error) { throw error; }
+    }),
+    error => {
+      if (error) {
+        throw error;
+      }
       cb(chunks);
     },
   );
@@ -195,16 +222,19 @@ test('default date', t => {
 
   t.plan(7);
 
-  const server = http.createServer((req, res) => {
-    t.is(req.url, '/planets');
-    res.end(`<rss><channel><title>Planets</title>
+  const server = http
+    .createServer((req, res) => {
+      t.is(req.url, '/planets');
+      res.end(`<rss><channel><title>Planets</title>
       <item><title>Mercury</title><guid>123</guid></item>
-      </channel></rss>`,
-    );
-  }).listen(port, er => {
-    if (er) { throw er; }
-    t.pass();
-  });
+      </channel></rss>`);
+    })
+    .listen(port, er => {
+      if (er) {
+        throw er;
+      }
+      t.pass();
+    });
 
   const store = common.createManger({objectMode: true});
 
@@ -217,9 +247,13 @@ test('default date', t => {
         cb();
       } else {
         common.teardown(store, er => {
-          if (er) { throw er; }
+          if (er) {
+            throw er;
+          }
           server.close(er => {
-            if (er) { throw er; }
+            if (er) {
+              throw er;
+            }
             t.pass();
           });
         });
@@ -244,13 +278,17 @@ test('entry updating', t => {
 
   const replies = [reply('Venus'), reply('Earth')];
 
-  const server = http.createServer((req, res) => {
-    t.is(req.url, '/planets');
-    res.end(replies.shift());
-  }).listen(port, er => {
-    if (er) { throw er; }
-    t.pass();
-  });
+  const server = http
+    .createServer((req, res) => {
+      t.is(req.url, '/planets');
+      res.end(replies.shift());
+    })
+    .listen(port, er => {
+      if (er) {
+        throw er;
+      }
+      t.pass();
+    });
 
   const store = common.createManger({objectMode: true});
   const id = `${origin}/planets`;
@@ -261,27 +299,49 @@ test('entry updating', t => {
       'bc8ac87954ac6cc46cf4f382e5fe2eb9ef904c1c',
     ];
 
-    t.same(entries.map(e => e.title), ['Mercury', 'Venus']);
-    t.same(entries.map(e => e.id), wanted);
+    t.same(
+      entries.map(e => e.title),
+      ['Mercury', 'Venus'],
+    );
+    t.same(
+      entries.map(e => e.id),
+      wanted,
+    );
 
     store.has(id, er => {
-      if (er) { throw er; }
+      if (er) {
+        throw er;
+      }
 
       store.flushCounter(er => {
-        if (er) { throw er; }
+        if (er) {
+          throw er;
+        }
 
         store.update((error, updated) => {
-          if (error) { throw error; }
+          if (error) {
+            throw error;
+          }
 
           read(store.entries(), id, entries => {
-            t.same(entries.map(e => e.title), ['Mercury', 'Earth']);
-            t.same(entries.map(e => e.id), wanted);
+            t.same(
+              entries.map(e => e.title),
+              ['Mercury', 'Earth'],
+            );
+            t.same(
+              entries.map(e => e.id),
+              wanted,
+            );
 
             common.teardown(store, er => {
-              if (er) { throw er; }
+              if (er) {
+                throw er;
+              }
 
               server.close(er => {
-                if (er) { throw er; }
+                if (er) {
+                  throw er;
+                }
                 t.end();
               });
             });

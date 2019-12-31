@@ -13,18 +13,15 @@ test('queries and requests', t => {
 
     s.on('readable', () => {
       let chunk;
-      while ((chunk = s.read()) !== null) { acc.push(chunk); }
+      while ((chunk = s.read()) !== null) {
+        acc.push(chunk);
+      }
     });
 
     // Failed requests are cached, an error is emitted only for the first
     // failure per URL. Invalid queries do not produce requests, so errors
     // are emitted for each of those.
-    const wanted = [
-      'ERR_INVALID_URL',
-      'ENOTFOUND',
-      'ERR_INVALID_URL',
-      'invalid protocol',
-    ];
+    const wanted = ['ERR_INVALID_URL', 'ERR_INVALID_URL', 'invalid protocol'];
 
     s.on('end', () => {
       t.same(acc.toString(), '[]');
@@ -50,9 +47,13 @@ test('queries and requests', t => {
 
   const teardown = (t, cache) => {
     return er => {
-      if (er) { throw er; }
+      if (er) {
+        throw er;
+      }
       common.teardown(cache, er => {
-        if (er) { throw er; }
+        if (er) {
+          throw er;
+        }
         t.end();
       });
     };

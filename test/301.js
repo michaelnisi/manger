@@ -1,4 +1,4 @@
-const StringDecoder = require('string_decoder').StringDecoder;
+const {StringDecoder} = require('string_decoder');
 const common = require('./lib/common');
 const http = require('http');
 const {test} = require('tap');
@@ -9,32 +9,36 @@ const decoder = new StringDecoder();
 test('first request', t => {
   t.plan(8);
 
-  const a = http.createServer((req, res) => {
-    t.pass();
+  const a = http
+    .createServer((req, res) => {
+      t.pass();
 
-    res.setHeader('ETag', '55346232-18151');
-    res.setHeader('Location', 'http://localhost:1338');
+      res.setHeader('ETag', '55346232-18151');
+      res.setHeader('Location', 'http://localhost:1338');
 
-    res.writeHead(301, {'Content-Type': 'text/xml; charset=UTF-8'});
-    res.end('ok');
-  }).listen(1337, 'localhost', () => {
-    t.pass();
-  });
+      res.writeHead(301, {'Content-Type': 'text/xml; charset=UTF-8'});
+      res.end('ok');
+    })
+    .listen(1337, 'localhost', () => {
+      t.pass();
+    });
 
-  const b = http.createServer((req, res) => {
-    t.pass();
+  const b = http
+    .createServer((req, res) => {
+      t.pass();
 
-    res.writeHead(200, {'Content-Type': 'text/xml; charset=UTF-8'});
-    res.end(`<rss>
+      res.writeHead(200, {'Content-Type': 'text/xml; charset=UTF-8'});
+      res.end(`<rss>
               <channel>
                 <item>
                   <pubDate>0</pubDate><title>Riley</title>
                 </item>
               </channel>
             </rss>`);
-  }).listen(1338, 'localhost', () => {
-    t.pass();
-  });
+    })
+    .listen(1338, 'localhost', () => {
+      t.pass();
+    });
 
   const s = cache.entries();
 
@@ -50,8 +54,12 @@ test('first request', t => {
       t.is(url, 'http://localhost:1338/');
     });
 
-    a.close(() => { t.pass(); });
-    b.close(() => { t.pass(); });
+    a.close(() => {
+      t.pass();
+    });
+    b.close(() => {
+      t.pass();
+    });
   });
 
   s.end('http://localhost:1337');
@@ -72,7 +80,9 @@ test('list', t => {
 
 test('update, without flushing first, ends', t => {
   cache.update((error, uris) => {
-    if (error) { throw error; }
+    if (error) {
+      throw error;
+    }
     t.is(uris.length, 0);
     t.end();
   });
@@ -80,7 +90,9 @@ test('update, without flushing first, ends', t => {
 
 test('flush counter', t => {
   cache.flushCounter((er, count) => {
-    if (er) { throw er; }
+    if (er) {
+      throw er;
+    }
     t.is(count, 1);
     t.end();
   });
@@ -89,11 +101,12 @@ test('flush counter', t => {
 test('update', t => {
   t.plan(5);
 
-  const b = http.createServer((req, res) => {
-    t.pass();
+  const b = http
+    .createServer((req, res) => {
+      t.pass();
 
-    res.writeHead(200, {'Content-Type': 'text/xml; charset=UTF-8'});
-    res.end(`<rss>
+      res.writeHead(200, {'Content-Type': 'text/xml; charset=UTF-8'});
+      res.end(`<rss>
               <channel>
                 <item>
                   <pubDate>0</pubDate><title>Riley</title>
@@ -103,12 +116,15 @@ test('update', t => {
                 </item>
               </channel>
             </rss>`);
-  }).listen(1338, 'localhost', () => {
-    t.pass();
-  });
+    })
+    .listen(1338, 'localhost', () => {
+      t.pass();
+    });
 
   cache.update((error, uris) => {
-    if (error) { throw error; }
+    if (error) {
+      throw error;
+    }
     t.is(uris.length, 1);
 
     const feed = uris[0];
@@ -139,7 +155,12 @@ test('updated entries', t => {
     });
 
     const titles = ['Riley', 'Sun'];
-    t.same(entries.map(({title}) => { return title; }), titles);
+    t.same(
+      entries.map(({title}) => {
+        return title;
+      }),
+      titles,
+    );
 
     t.end();
   });
@@ -185,7 +206,9 @@ test('feeds', t => {
 
 test('flush counter', t => {
   cache.flushCounter((er, count) => {
-    if (er) { throw er; }
+    if (er) {
+      throw er;
+    }
     t.is(count, 1);
     t.end();
   });
@@ -211,7 +234,9 @@ test('ranks', t => {
 
 test('teardown', t => {
   common.teardown(cache, er => {
-    if (er) { throw er; }
+    if (er) {
+      throw er;
+    }
     t.end();
   });
 });

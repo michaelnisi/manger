@@ -18,8 +18,6 @@ function createManger() {
   return new Manger(db, {objectMode: true});
 }
 
-const cache = createManger();
-
 const server = repl.start({
   ignoreUndefined: true,
   input: process.stdin,
@@ -56,6 +54,8 @@ function read(s, prop) {
     });
 }
 
+const cache = createManger();
+
 /**
  * Fills the cache with some feeds.
  *
@@ -76,17 +76,4 @@ const {context} = server;
 context.clear = clear;
 context.fill = fill;
 context.read = read;
-
-function bindCache() {
-  for (const name of Object.getOwnPropertyNames(Manger.prototype)) {
-    const f = cache[name];
-
-    if (name === 'constructor' || typeof f !== 'function') {
-      return;
-    }
-
-    context[name] = f.bind(cache);
-  }
-}
-
-bindCache();
+context.cache = cache;

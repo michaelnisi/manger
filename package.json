@@ -5,8 +5,9 @@
   "main": "index.js",
   "scripts": {
     "pretest": "eslint *.js ./lib/*.js --fix",
-    "test": "tap test/*.js -j1 -b",
-    "posttest": "rm -rf /tmp/manger-[1-9]* "
+    "test": "tap test/*.js -j1",
+    "posttest": "rm -rf /tmp/manger-[1-9]* ",
+    "start": "./repl.js"
   },
   "repository": {
     "type": "git",
@@ -15,7 +16,13 @@
   "bugs": {
     "url": "https://github.com/michaelnisi/manger/issues"
   },
-  "keywords": ["rss", "atom", "xml", "feed", "cache"],
+  "keywords": [
+    "rss",
+    "atom",
+    "xml",
+    "feed",
+    "cache"
+  ],
   "license": "MIT",
   "homepage": "https://github.com/michaelnisi/manger",
   "dependencies": {
