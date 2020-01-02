@@ -1,4 +1,5 @@
 // http - HTTP tests
+// @ts-check
 
 const http = require('http');
 const path = require('path');
@@ -37,6 +38,7 @@ test('ENOTFOUND', t => {
       if (er) {
         throw er;
       }
+
       t.pass('should teardown');
       t.end();
     });
@@ -44,6 +46,7 @@ test('ENOTFOUND', t => {
 
   feeds.on('readable', () => {
     let chunk;
+
     while ((chunk = feeds.read())) {
       acc.push(chunk);
     }
@@ -65,6 +68,7 @@ test('ETag', t => {
 
   const headers = {
     'content-type': 'text/xml; charset=UTF-8',
+    // eslint-disable-next-line quote-props
     ETag: '55346232-18151',
     'content-encoding': 'gzip',
   };
@@ -85,10 +89,13 @@ test('ETag', t => {
 
       if (diff.method === 'GET') {
         const wanted = {
+          // eslint-disable-next-line quote-props
           accept: '*/*',
           'accept-encoding': 'gzip',
+          // eslint-disable-next-line quote-props
           host: 'localhost:1337',
           'user-agent': `nodejs/${process.version}`,
+          // eslint-disable-next-line quote-props
           connection: 'close',
         };
         const found = req.headers;
@@ -97,11 +104,14 @@ test('ETag', t => {
         createFileStream('b2w.xml', true).pipe(res);
       } else if (diff.method === 'HEAD') {
         const wanted = {
+          // eslint-disable-next-line quote-props
           accept: '*/*',
           'accept-encoding': 'gzip',
+          // eslint-disable-next-line quote-props
           host: 'localhost:1337',
           'if-none-match': '55346232-18151',
           'user-agent': `nodejs/${process.version}`,
+          // eslint-disable-next-line quote-props
           connection: 'close',
         };
         const found = req.headers;
@@ -152,6 +162,7 @@ test('ETag', t => {
       t.is(found.length, 2, 'should only emit unforced');
 
       const first = found[0];
+
       found.forEach(feed => {
         t.same(first, feed);
       });
@@ -160,11 +171,13 @@ test('ETag', t => {
         if (er) {
           throw er;
         }
+
         t.pass('should close server');
-        teardown(store, er => {
-          if (er) {
-            throw er;
+        teardown(store, teardownError => {
+          if (teardownError) {
+            throw teardownError;
           }
+
           t.pass('should teardown');
         });
       });
@@ -234,25 +247,25 @@ test('301 while cached', t => {
         t.is(fixtures.length, 0);
         JSON.parse(buf);
 
-        cache.has('http://localhost:1337/b2w', er => {
-          t.ok(er, 'should not be cached');
+        cache.has('http://localhost:1337/b2w', cacheError => {
+          t.ok(cacheError, 'should not be cached');
         });
-        cache.has('http://localhost:1337/ddc', er => {
-          if (er) {
-            throw er;
+        cache.has('http://localhost:1337/ddc', cacheError => {
+          if (cacheError) {
+            throw cacheError;
           }
           t.pass('should be cached');
         });
 
-        server.close(er => {
-          if (er) {
-            throw er;
+        server.close(closeError => {
+          if (closeError) {
+            throw closeError;
           }
           t.pass('should close server');
 
-          teardown(cache, er => {
-            if (er) {
-              throw er;
+          teardown(cache, teardownError => {
+            if (teardownError) {
+              throw teardownError;
             }
             t.pass('should teardown');
           });
@@ -265,18 +278,21 @@ test('301 while cached', t => {
     });
 });
 
-function done(server, cache, t, cb) {
+function done(server, cache, t, cb = error => {}) {
   server.close(er => {
     if (er) {
-      throw er;
+      cb(er);
+      return;
     }
+
     t.pass('should close server');
     if (!cache) {
-      return cb ? cb() : null;
+      cb();
+      return;
     }
-    teardown(cache, er => {
-      if (er) {
-        throw er;
+    teardown(cache, teardownError => {
+      if (teardownError) {
+        throw teardownError;
       }
       t.pass('should teardown');
       if (cb) {
@@ -287,8 +303,11 @@ function done(server, cache, t, cb) {
 }
 
 test('HEAD 404', t => {
+  t.plan(16);
+
   const headers = {
     'content-type': 'text/xml; charset=UTF-8',
+    // eslint-disable-next-line quote-props
     ETag: '55346232-18151',
   };
 
@@ -322,8 +341,6 @@ test('HEAD 404', t => {
   ];
 
   const go = () => {
-    t.plan(16);
-
     const store = createManger();
     const feeds = store.feeds();
 
@@ -344,10 +361,10 @@ test('HEAD 404', t => {
       JSON.parse(chunks);
       done(server, store, t, er => {
         if (er) {
-          throw er;
+          t.fail(er.message);
         }
 
-        t.end();
+        t.pass();
       });
     });
 
@@ -379,6 +396,8 @@ test('HEAD 404', t => {
 });
 
 test('HEAD ECONNREFUSED', t => {
+  t.plan(9);
+
   const go = () => {
     const store = createManger();
     const feeds = store.feeds();
@@ -414,9 +433,10 @@ test('HEAD ECONNREFUSED', t => {
 
     feeds.on('end', () => {
       JSON.parse(chunks);
-      teardown(store, er => {
-        if (er) {
-          throw er;
+      t.pass();
+      teardown(store, teardownError => {
+        if (teardownError) {
+          throw teardownError;
         }
         t.pass('should teardown');
       });
@@ -425,8 +445,6 @@ test('HEAD ECONNREFUSED', t => {
     t.ok(feeds.write(url));
   };
 
-  t.plan(9);
-
   const server = http
     .createServer((req, res) => {
       t.is(req.url, '/b2w.xml');
@@ -434,6 +452,7 @@ test('HEAD ECONNREFUSED', t => {
 
       const headers = {
         'content-type': 'text/xml; charset=UTF-8',
+        // eslint-disable-next-line quote-props
         ETag: '55346232-18151',
       };
 
@@ -444,21 +463,32 @@ test('HEAD ECONNREFUSED', t => {
       if (er) {
         throw er;
       }
+
       t.pass('should listen on 1337');
       go();
     });
 });
 
 test('HEAD socket hangup', t => {
+  t.plan(14);
+
   const go = () => {
     const store = createManger();
     const feeds = store.feeds();
 
+    // TODO: Why?
     feeds.on('error', er => {
-      t.is(er.message, 'socket hang up', 'should err twice');
+      t.is(er.message, 'socket hang up');
     });
+
     feeds.on('end', () => {
-      done(server, store, t);
+      done(server, store, t, er => {
+        if (er) {
+          throw er;
+        }
+
+        t.pass();
+      });
     });
 
     const url = 'http://localhost:1337/b2w.xml';
@@ -476,6 +506,7 @@ test('HEAD socket hangup', t => {
 
   const headers = {
     'content-type': 'text/xml; charset=UTF-8',
+    // eslint-disable-next-line quote-props
     ETag: '55346232-18151',
   };
 
@@ -500,8 +531,6 @@ test('HEAD socket hangup', t => {
       res.destroy(new Error('oh shit'));
     },
   ];
-
-  t.plan(14);
 
   const server = http
     .createServer((req, res) => {
