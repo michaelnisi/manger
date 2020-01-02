@@ -396,14 +396,14 @@ test('HEAD 404', t => {
 });
 
 test('HEAD ECONNREFUSED', t => {
-  t.plan(9);
+  t.plan(8);
 
   const go = () => {
     const store = createManger();
     const feeds = store.feeds();
 
     feeds.on('error', er => {
-      t.is(er.message, 'connect ECONNREFUSED 127.0.0.1:1337');
+      t.fail(`should not emit error: ${er}`);
     });
 
     let chunks = '';
@@ -470,15 +470,14 @@ test('HEAD ECONNREFUSED', t => {
 });
 
 test('HEAD socket hangup', t => {
-  t.plan(14);
+  t.plan(13);
 
   const go = () => {
     const store = createManger();
     const feeds = store.feeds();
 
-    // TODO: Why?
     feeds.on('error', er => {
-      t.is(er.message, 'socket hang up');
+      t.fail(`should not emit error: ${er}`);
     });
 
     feeds.on('end', () => {

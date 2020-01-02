@@ -7,7 +7,7 @@
     "pretest": "eslint *.js ./lib/*.js --fix",
     "test": "tap test/*.js -j1",
     "posttest": "rm -rf /tmp/manger-[1-9]* ",
-    "start": "./repl.js"
+    "start": "NODE_DEBUG=manger ./repl.js"
   },
   "repository": {
     "type": "git",
