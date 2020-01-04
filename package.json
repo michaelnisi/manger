@@ -47,7 +47,7 @@
     "tap": "^14.2.2"
   },
   "engines": {
-    "node": ">=10"
+    "node": ">=12"
   },
   "author": "Michael Nisi (https://troubled.pro/)",
   "directories": {
