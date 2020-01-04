@@ -1,4 +1,6 @@
-.travis.yml
+.eslintrc.js
 .nyc_output
-tools
+.prettierrc.js
+.travis.yml
 test
+tools
