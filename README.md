@@ -7,8 +7,6 @@ The Manger [Node.js](http://nodejs.org/) package provides caching for RSS and At
 
 Manger leverages the lexicographical key sort order of [LevelDB](http://leveldb.org/). The keys are designed to stream feeds or entries in time ranges between now and some user defined point in the past.
 
-The distinction between feed and entries might be unclear: a feed models the metadata of an RSS or Atom feed (title, author, published, etc.), while entries are the actual items in the feed. These are detached to not repeatedly transmit feed metadata—after all Manger tries to reduce round-trips.
-
 ## Data and Types
 
 ### void()
@@ -38,7 +36,7 @@ An individual entry.
 - `author` `str()`
 - `duration` `Number() | null` The value of the `<itunes:duration>` tag in seconds or `null`.
 - `enclosure` `enclosure() | void()`
-- `id` `String()` A globally unique, not the original, identifier for this entry.
+- `id` `String()` A globally unique, not the original, (SHA-1) identifier for this entry.
 - `image` `str()`
 - `link` `str()`
 - `originalURL` `str()` The originally requested URL.
@@ -47,6 +45,12 @@ An individual entry.
 - `title` `str()`
 - `updated` `str()`
 - `url` `str()` The URL of this entry’s feed.
+
+Why SHA-1, cryptographic hashing, to produce the `id` property?
+
+> Having a good hash is good for being able to trust your data, it happens to have some other good features, too, it means when we hash objects, we know the hash is well distributed and we do not have to worry about certain distribution issues.
+
+Read more [here](https://stackoverflow.com/questions/28792784/why-does-git-use-a-cryptographic-hash-function).
 
 ### feed()
 
@@ -67,17 +71,13 @@ One metadata object per XML feed.
 - `updated` `Number()`
 - `url` `str()`
 
-Why SHA-1, cryptographic hashing, to produce the `id` property?
-
-> Having a good hash is good for being able to trust your data, it happens to have some other good features, too, it means when we hash objects, we know the hash is well distributed and we do not have to worry about certain distribution issues.
-
-Read more [here](https://stackoverflow.com/questions/28792784/why-does-git-use-a-cryptographic-hash-function).
-
-## Creating a new cache
+## Creating a Cache
 
 ```js
-const {createLevelDB, Opts, Manger} = require('manger');
+const {createLevelDB, Manger, Opts} = require('manger');
 ```
+
+We need a [Level](https://github.com/Level/level) database for creating a cache. Additionally, we can pass options or use defaults.
 
 ### Opts
 
@@ -93,7 +93,15 @@ Options for a `Manger` instance.
 - `objectMode = false` Read `Object()` instead of `Buffer()`.
 - `redirects = { set, get, has }` LRU cache for redirects.
 
+```js
+const db = createLevelDB('/tmp/manger');
+const opts = {}; // | new Opts()
+const cache = new Manger(db, opts);
+```
+
 ## Querying the Manger Cache
+
+A Manger cache object provides multiple streams to access data. Selecting data works by writing query objects to these streams.
 
 ```js
 const {Queries, Query} = require('manger');
@@ -112,7 +120,7 @@ Sourced with inaccurate URLs the `Query` constructor throws.
 
 ### Queries
 
-The `Queries` class transforms JSON to queries which can be piped to `feeds()` and `entries()`. The expected JSON input format:
+For convenience, the `Queries` class transforms JSON to queries which can be piped to `feeds()` and `entries()`. The expected JSON input format:
 
 ```js
 [
@@ -129,13 +137,65 @@ Where `"since"` can be anything `Date()` is able to parse.
 
 ## Querying Feeds
 
-```js
-const {Feeds, Queries, Query, Manger} = require('manger');
-```
+The distinction between feed and entries might be unclear: a feed models the metadata of an RSS or Atom feed (title, author, published, etc.), while entries are the actual items in the feed. These are detached to not repeatedly transmit feed metadata—after all Manger tries to reduce round-trips.
 
 ### cache.feeds()
 
-### cache.list()
+Returns a [Transform](http://nodejs.org/api/stream.html#stream_class_stream_transform) stream that transforms queries or URL strings to feeds.
+
+- `write(query() | String())`
+- `read()` `Buffer() | String() | Object() | feed()`
+
+```js
+const feeds = cache.feeds();
+
+feeds.on('readable', () => {
+  let data;
+
+  while ((data = this.read())) {
+    console.log(data);
+  }
+});
+
+feeds.write(new Query({url: 'http://rss.art19.com/the-daily'}));
+```
+
+## Querying Entries
+
+Access granular ranges of items within multiple feeds at once – using a single stream.
+
+### cache.entries()
+
+Returns a [Transform](http://nodejs.org/api/stream.html#stream_class_stream_transform) stream that transforms queries or URLs to entries.
+
+- `write(Buffer() | String() | Object() | query())`
+- `read()` `Buffer() | entry()`
+
+```js
+const entries = cache.entries();
+
+entries.on('readable', () => {
+  let data;
+
+  while ((data = this.read())) {
+    console.log(data);
+  }
+});
+
+entries.write(new Query({url: 'http://rss.art19.com/the-daily'}));
+```
+
+## Updating the Cache
+
+It’s common to update all cached feeds on a regular basis. Manger uses a counter to reason about which feeds to update first.
+
+### cache.flushCounter(cb)
+
+- `cb` `Function(error, count) | void()` The callback
+  - `error` `Error() | void()` The possible error
+  - `count` `Number()` Total number of cached feeds
+
+A Manger cache keeps an in-memory count of how many times feeds have been accessed. This function flushes the counter to disk, updating the ranks index.
 
 ### cache.update()
 
@@ -143,39 +203,9 @@ Updates all ranked feeds and returns a stream that emits feed URLs of updated fe
 
 - `read()` `str()`
 
-### Feeds
-
-A stream that transforms queries or URL strings to feeds.
-
-- `write(query() | String())`
-- `read()` `Buffer() | String() | Object() | feed()`
-
-## Querying Entries
-
-```js
-const {Entries, Queries, Query} = require('manger');
-```
-
-### Entries
-
-A [Transform](http://nodejs.org/api/stream.html#stream_class_stream_transform) stream that transforms queries or URLs to entries.
-
-- `write(Buffer() | String() | Object() | query())`
-- `read()` `Buffer() | entry()`
-
-## Updating the Cache
-
-```js
-const {URLs, FeedURLs} = require('manger');
-```
-
-### FeedURLs
-
-A [Readable](http://nodejs.org/api/stream.html#stream_class_stream_readable_1) stream of URLs of all feeds currently cached.
-
-- `read()` `Buffer() | str()`
-
 ## Removing Feeds from the Cache
+
+Sometimes feeds contain redundant or unwanted items, so you might want to remove them from the cache.
 
 ### cache.remove(url, cb)
 
@@ -186,6 +216,12 @@ Attempts to remove a feed matching the `url` from the cache and applies callback
   - `error` `Error() | void()` The possible error
 
 ## Observing Cache Contents
+
+### cache.list()
+
+A [Readable](http://nodejs.org/api/stream.html#stream_class_stream_readable_1) stream of URLs of all feeds currently cached.
+
+- `read()` `Buffer() | str()`
 
 ### cache.has(url, cb)
 
@@ -213,19 +249,11 @@ Resets the ranks index.
 - `cb` [`Function`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function)`(error)` The callback
   - `error` [`Error()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error) `| void()` The possible error
 
-### cache.flushCounter(cb)
+### Event: 'hit'
 
-- `cb` `Function(error, count) | void()` The callback
-  - `error` `Error() | void()` The possible error
-  - `count` `Number()` Total number of cached feeds
+- `query()` The query that hit the cache.
 
-**manger** keeps an in-memory count of how many times feeds have been accessed. This function flushes the counter to disk, updating the ranks index.
-
-#### Event: 'hit'
-
-- `query()` The query hitting the cache.
-
-Making sure you feel good about yourself.
+For each cache hit the Manger cache emits a `hit` event.
 
 ## Installation
 
