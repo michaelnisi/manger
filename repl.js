@@ -33,9 +33,6 @@ const server = repl.start({
  * @param {string} prop A property name for filtering.
  */
 function read(s, prop) {
-  // Reading manually – pipeline wouldn’t be a good fit because error
-  // forwarding would stall our stream, but here we want to keep reading
-  // all the way to the end.
   s.once('error', er => {
     log(er);
   })
@@ -45,6 +42,7 @@ function read(s, prop) {
         const item = prop ? obj[prop] : obj;
 
         dir(item, {colors: true});
+        server.displayPrompt();
       }
     })
     .on('end', () => {
