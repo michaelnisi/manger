@@ -1,32 +1,48 @@
-// common - common test gear
+// @ts-check
 
-exports.freshDB = freshDB
-exports.freshManger = freshManger
-exports.teardown = teardown
+module.exports = {
+  createManger,
+  teardown,
+};
 
-const levelup = require('levelup')
-const manger = require('../../')
-const rimraf = require('rimraf')
+const assert = require('assert');
+const rimraf = require('rimraf');
+const {Manger, createLevelDB} = require('../../');
+const {defaults} = require('../../lib/init');
 
-function freshName () {
-  return '/tmp/manger-' + Math.floor(Math.random() * (1 << 24))
+/**
+ * Returns a new Manger object initialized with `custom` options.
+ */
+function createManger(custom) {
+  // eslint-disable-next-line no-bitwise
+  const name = '/tmp/manger-' + Math.floor(Math.random() * (1 << 24));
+  const opts = defaults(custom);
+  const db = createLevelDB(name);
+
+  return new Manger(db, opts);
 }
 
-function freshDB () {
-  const name = freshName()
-  return levelup(name)
-}
+function teardown(cache, cb) {
+  const {db} = cache;
+  assert(db);
 
-function freshManger (opts) {
-  const name = freshName()
-  return manger(name, opts)
-}
+  db.close(closeError => {
+    if (closeError) {
+      throw closeError;
+    }
 
-function teardown (cache, cb) {
-  const db = cache.db
-  const p = db.location
-  rimraf(p, (er) => {
-    if (cb) return cb(er)
-    if (er) throw er
-  })
+    const {
+      _db: {
+        db: {location},
+      },
+    } = db;
+
+    rimraf(location, cleanUpError => {
+      if (cleanUpError) {
+        throw cleanUpError;
+      }
+
+      cb();
+    });
+  });
 }

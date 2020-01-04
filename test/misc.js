@@ -1,127 +1,138 @@
-'use strict'
+// @ts-check
 
-var base = require('../lib/streams_base')
-var manger = require('../')
-var stringDecoder = require('string_decoder')
+const {StringDecoder} = require('string_decoder');
+const {Query} = require('../');
+const {test} = require('tap');
+const {createManger} = require('./lib/common');
+const {
+  charsetFromResponse,
+  failureKey,
+  sameEtag,
+  processQuery,
+  newer,
+} = require('../lib/streams_base');
 
-const { test } = require('tap')
-const { freshManger } = require('./lib/common')
+test('closed database', t => {
+  const cache = createManger();
 
-test('closed database', (t) => {
-  const cache = freshManger()
-
-  t.plan(1)
+  t.plan(1);
   cache.db.close(er => {
     t.throws(() => {
-      t.ok(cache.db.isClosed)
-    })
-  })
-})
+      t.ok(cache.db.isClosed);
+    });
+  });
+});
 
-test('charset from response', function (t) {
-  var f = base.charsetFromResponse
-  function res (str) {
+test('charset from response', t => {
+  const res = str => {
+    const headers = {'content-type': str};
+
     return {
-      headers: {
-        'content-type': str
+      getHeader: name => {
+        return headers[name];
       },
-      getHeader: function (name) {
-        return this.headers[name]
-      }
-    }
-  }
-  var wanted = [
-    null,
-    null,
-    'UTF-8'
-  ]
-  var found = [
-    f(null),
-    f({}),
-    f(res('text/xml; charset=UTF-8'))
-  ]
-  t.plan(wanted.length)
-  wanted.forEach(function (it) {
-    t.is(found.shift(), it)
-  })
-})
+    };
+  };
 
-test('failure keys', function (t) {
-  var f = base.failureKey
-  t.throws(function () { f() })
-  t.throws(function () { f(null) })
-  t.throws(function () { f(123) })
-  t.throws(function () { f('GET', 123) })
-  t.is(f('HEAD', 'http://abc.de/'), 'HEAD-http://abc.de/')
-  t.end()
-})
+  const wanted = [null, null, 'UTF-8'];
 
-test('compare etags', function (t) {
-  var f = base.sameEtag
-  var wanted = [
-    false,
-    false,
-    false,
-    true
-  ]
-  var found = [
-    f({}, { headers: {} }),
-    f({ etag: '123' }, { headers: {} }),
-    f({}, { headers: { etag: '123' } }),
-    f({ etag: '123' }, { headers: { etag: '123' } })
-  ]
-  t.plan(wanted.length)
-  wanted.forEach(function (it) {
-    t.is(found.shift(), it)
-  })
-})
+  const found = [
+    charsetFromResponse(null),
+    charsetFromResponse({}),
+    charsetFromResponse(res('text/xml; charset=UTF-8')),
+  ];
 
-test('process query', function (t) {
-  var f = base.processQuery
-  var wanted = [
-    manger.query('abc'),
-    manger.query('abc'),
-    manger.query('abc', undefined, undefined, true),
-    manger.query('abc', undefined, undefined, true)
-  ]
-  function Surrogate (force) {
-    this.decoder = new stringDecoder.StringDecoder()
-    this.force = force || false
-  }
-  var m = new Surrogate()
-  var mf = new Surrogate(true)
-  var found = [
-    f(m, 'abc'),
-    f(m, Buffer.from('abc')),
-    f(mf, 'abc'),
-    f(mf, Buffer.from('abc'))
-  ]
-  t.plan(wanted.length)
-  wanted.forEach(function (it) {
-    t.same(found.shift(), it)
-  })
-})
+  t.plan(wanted.length);
 
-test('newer', function (t) {
-  var f = base.newer
-  var wanted = [
-    true,
-    true,
-    false
-  ]
-  function item (time) {
-    return { updated: time }
+  for (const it of wanted) {
+    t.is(found.shift(), it);
   }
-  function query (time) {
-    return { since: time }
+});
+
+test('failure keys', t => {
+  t.throws(() => {
+    failureKey();
+  });
+  t.throws(() => {
+    failureKey(null);
+  });
+  t.throws(() => {
+    failureKey(123);
+  });
+  t.throws(() => {
+    failureKey('GET', 123);
+  });
+  t.is(failureKey('HEAD', 'http://abc.de/'), 'HEAD-http://abc.de/');
+  t.end();
+});
+
+test('compare etags', t => {
+  const wanted = [false, false, false, true];
+
+  const found = [
+    sameEtag({}, {headers: {}}),
+    sameEtag({etag: '123'}, {headers: {}}),
+    sameEtag({}, {headers: {etag: '123'}}),
+    sameEtag({etag: '123'}, {headers: {etag: '123'}}),
+  ];
+
+  t.plan(wanted.length);
+  wanted.forEach(it => {
+    t.is(found.shift(), it);
+  });
+});
+
+test('process query', t => {
+  const wanted = [
+    new Query({url: 'https://abc.de/'}),
+    new Query({url: 'https://abc.de/'}),
+    new Query({url: 'https://abc.de/', force: true}),
+    new Query({url: 'https://abc.de/', force: true}),
+  ];
+
+  function Surrogate(force) {
+    this.decoder = new StringDecoder();
+    this.force = force || false;
+    this.redirects = {
+      get: () => {},
+    };
   }
-  var found = [
-    f(item(0), query(0)),
-    f(item(1), query(0)),
-    f(item(1), query(1))
-  ]
-  t.plan(wanted.length)
-  wanted.forEach(function (it) {
-    t.same(found.shift(), it)
-  })
-})
+
+  const m = new Surrogate();
+  const mf = new Surrogate(true);
+  const found = [
+    processQuery(m, 'https://abc.de/'),
+    processQuery(m, Buffer.from('https://abc.de/')),
+    processQuery(mf, 'https://abc.de/'),
+    processQuery(mf, Buffer.from('https://abc.de/')),
+  ];
+
+  t.plan(wanted.length);
+
+  for (const it of wanted) {
+    t.same(found.shift(), it);
+  }
+});
+
+test('newer', t => {
+  const wanted = [true, true, false];
+
+  function item(time) {
+    return {updated: time};
+  }
+
+  function query(time) {
+    return {since: time};
+  }
+
+  const found = [
+    newer(item(0), query(0)),
+    newer(item(1), query(0)),
+    newer(item(1), query(1)),
+  ];
+
+  t.plan(wanted.length);
+  for (const it of wanted) {
+    t.same(found.shift(), it);
+  }
+});

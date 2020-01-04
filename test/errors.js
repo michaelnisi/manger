@@ -1,67 +1,81 @@
-'use strict'
+// errors - check errors
+// @ts-check
 
-const common = require('./lib/common')
-const test = require('tap').test
+const common = require('./lib/common');
+const {test} = require('tap');
 
-test('queries and requests', (t) => {
-  function go (s, t, cb) {
-    const found = []
-    s.on('error', (er) => {
-      found.push(er)
-    })
+function check(s, t, cb) {
+  const found = [];
 
-    let buf = ''
-    s.on('readable', () => {
-      let chunk
-      while ((chunk = s.read()) !== null) { buf += chunk }
-    })
-    // Failed requests are cached, an error is emitted only for the first
-    // failure per URL. Invalid queries do not produce requests, so errors
-    // are emitted for each of those.
-    const wanted = [
-      'invalid query',
-      'getaddrinfo ENOTFOUND',
-      'invalid query',
-      'invalid protocol'
-    ]
-    s.on('finish', () => {
-      t.same(JSON.parse(buf), [])
-      t.is(found.length, wanted.length)
-      wanted.forEach((it) => {
-        t.ok(found.shift().message.match(new RegExp(it)))
-      })
-      cb()
-    })
+  s.on('error', er => {
+    found.push(er);
+  });
 
-    t.ok(s.write('abc'))
-    t.ok(s.write('http://def'))
-    t.ok(s.write('ghi'))
-    t.ok(s.write('feed://abc'))
-    t.ok(s.write('http://def'))
-    s.end()
-  }
+  const acc = [];
 
-  t.plan(2, 'same tests for feeds and entries')
+  s.on('readable', () => {
+    let chunk;
 
-  const teardown = (t, cache) => {
-    return (er) => {
-      if (er) throw er
-      common.teardown(cache, (er) => {
-        if (er) throw er
-        t.end()
-      })
+    while ((chunk = s.read()) !== null) {
+      acc.push(chunk);
     }
-  }
+  });
 
-  t.test('feeds', (t) => {
-    const cache = common.freshManger()
-    const feeds = cache.feeds()
-    go(feeds, t, teardown(t, cache))
-  })
+  // Failed requests are cached, an error is emitted only for the first
+  // failure per URL. Invalid queries do not produce requests, so errors
+  // are emitted for each of those.
+  const wanted = ['ERR_INVALID_URL', 'ERR_INVALID_URL'];
 
-  t.test('entries', (t) => {
-    const cache = common.freshManger()
-    const entries = cache.entries()
-    go(entries, t, teardown(t, cache))
-  })
-})
+  s.on('end', () => {
+    t.same(acc.toString(), '[]');
+    t.is(found.length, wanted.length);
+
+    for (const it of wanted) {
+      const {code, message} = found.shift();
+      code ? t.is(code, it) : t.is(message, it);
+    }
+
+    cb();
+  });
+
+  t.ok(s.write('abc'));
+  t.ok(s.write('http://def'));
+  t.ok(s.write('ghi'));
+  t.ok(s.write('feed://abc'));
+  t.ok(s.write('http://def'));
+  s.end();
+}
+
+function teardown(t, cache) {
+  return er => {
+    if (er) {
+      throw er;
+    }
+
+    common.teardown(cache, teardownError => {
+      if (teardownError) {
+        throw teardownError;
+      }
+
+      t.end();
+    });
+  };
+}
+
+test('queries and requests', t => {
+  t.plan(2, 'same tests for feeds and entries');
+
+  t.test('feeds', tt => {
+    const cache = common.createManger();
+    const feeds = cache.feeds();
+
+    check(feeds, tt, teardown(tt, cache));
+  });
+
+  t.test('entries', tt => {
+    const cache = common.createManger();
+    const entries = cache.entries();
+
+    check(entries, tt, teardown(tt, cache));
+  });
+});

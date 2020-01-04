@@ -1,12 +1,13 @@
 {
   "name": "manger",
-  "version": "7.0.7",
+  "version": "8.0.0",
   "description": "cache feeds",
   "main": "index.js",
   "scripts": {
-    "pretest": "standard --fix",
-    "test": "tap test/*.js -j1 --cov",
-    "posttest": "rm -rf /tmp/manger-[1-9]* "
+    "pretest": "eslint *.js ./lib/*.js --fix",
+    "test": "tap test/*.js -j1",
+    "posttest": "rm -rf /tmp/manger-[1-9]* ",
+    "start": "./repl.js"
   },
   "repository": {
     "type": "git",
@@ -22,27 +23,31 @@
     "feed",
     "cache"
   ],
-  "engines": {
-    "node": ">=7 <10"
-  },
   "license": "MIT",
   "homepage": "https://github.com/michaelnisi/manger",
   "dependencies": {
-    "bytewise": "^1.1.0",
+    "charwise": "^3.0.1",
     "headary": "^2.0.0",
     "html-reduce": "^1.0.3",
-    "leveldown": "^1.7.2",
-    "levelup": "^1.3.8",
+    "level": "^6.0.0",
     "lru-cache": "^4.1.3",
     "pickup": "^8.1.0",
-    "readable-stream": "^2.3.6"
+    "readable-stream": "^3.4.0"
   },
   "devDependencies": {
+    "@types/node": "^13.1.1",
+    "@types/readable-stream": "^2.3.5",
     "binary-split": "^1.0.5",
+    "eslint": "^6.8.0",
+    "eslint-config-fbjs-opensource": "^2.0.1",
+    "eslint-plugin-import": "^2.19.1",
+    "prettier": "^1.19.1",
     "rimraf": "^2.6.1",
-    "standard": "^12.0.1",
     "stread": "^3.0.1",
     "tap": "^14.2.2"
+  },
+  "engines": {
+    "node": ">=10"
   },
   "author": "Michael Nisi (https://troubled.pro/)",
   "directories": {
