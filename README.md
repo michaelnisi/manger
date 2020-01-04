@@ -7,6 +7,24 @@ The Manger [Node.js](http://nodejs.org/) package provides caching for RSS and At
 
 Manger leverages the lexicographical key sort order of [LevelDB](http://leveldb.org/). The keys are designed to stream feeds or entries in time ranges between now and some user defined point in the past.
 
+## REPL
+
+There’s a REPL for exploring the API.
+
+```
+$ npm start
+
+> manger@8.0.0 start /Users/michael/node/manger
+> ./repl.js
+
+manger> const feeds = cache.feeds()
+manger> feeds.write('http://rss.art19.com/the-daily')
+true
+manger> read(feeds, 'title')
+manger> 'The Daily'
+manger>
+```
+
 ## Data and Types
 
 ### void()
@@ -253,7 +271,7 @@ Resets the ranks index.
 
 - `query()` The query that hit the cache.
 
-For each cache hit the Manger cache emits a `hit` event.
+For each cache hit the Manger cache emits a `'hit'` event.
 
 ## Installation
 
@@ -261,24 +279,6 @@ With [npm](https://npmjs.org/package/manger), do:
 
 ```
 $ npm install manger
-```
-
-## REPL
-
-There’s a REPL for exploring the API.
-
-```
-$ npm start
-
-> manger@8.0.0 start /Users/michael/node/manger
-> ./repl.js
-
-manger> const feeds = cache.feeds()
-manger> feeds.write('http://rss.art19.com/the-daily')
-true
-manger> read(feeds, 'title')
-manger> 'The Daily'
-manger>
 ```
 
 ## License
