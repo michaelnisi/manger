@@ -30,6 +30,13 @@ test('trim', t => {
   t.end();
 });
 
+test('npr', t => {
+  const npr = 'https://www.npr.org/rss/podcast.php?id=510308';
+
+  t.is(Query.trim(npr), npr);
+  t.end();
+});
+
 test('query', t => {
   t.throws(() => {
     return new Query({url: ' 5by5.tv/d '});
@@ -72,6 +79,7 @@ test('request', t => {
     new Query({url: 'http://abc.def/ghi.jkl'}).request(),
     new Query({url: 'http://abc.def/ghi.jkl', etag: '123'}).request(),
     new Query({url: 'https://abc.def/ghi.jkl'}).request(),
+    new Query({url: 'https://abc.def/ghi.jkl?id=123'}).request(),
   ];
 
   const headers = {
@@ -102,6 +110,14 @@ test('request', t => {
       hostname: 'abc.def',
       port: 443,
       path: '/ghi.jkl',
+      method: 'GET',
+      protocol: 'https:',
+      headers,
+    },
+    {
+      hostname: 'abc.def',
+      port: 443,
+      path: '/ghi.jkl?id=123',
       method: 'GET',
       protocol: 'https:',
       headers,
